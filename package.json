@@ -1,0 +1,48 @@
+{
+  "name": "lyfr",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
+  },
+  "private": true,
+  "dependencies": {
+    "@notifee/react-native": "^9.1.8",
+    "@sentry/react-native": "^8.26.0",
+    "date-fns": "^4.4.0",
+    "drizzle-orm": "^0.45.2",
+    "expo": "^57.0.23",
+    "expo-background-task": "~57.0.18",
+    "expo-file-system": "~57.0.7",
+    "expo-image": "~57.0.5",
+    "expo-image-manipulator": "~57.0.18",
+    "expo-image-picker": "~57.0.18",
+    "expo-router": "~57.0.21",
+    "expo-splash-screen": "~57.0.9",
+    "expo-sqlite": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.4",
+    "react": "^19.2.3",
+    "react-native": "^0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-mmkv": "^4.3.2",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/react": "^19.3.0",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

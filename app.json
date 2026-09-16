@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "lyfr",
+    "slug": "lyfr",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "lyfr",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "ph.pauladrian.lyfr",
+      "icon": "./assets/images/icon.png"
+    },
+    "android": {
+      "package": "ph.pauladrian.lyfr",
+      "adaptiveIcon": {
+        "backgroundColor": "#1B4767",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "RECEIVE_BOOT_COMPLETED"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#EDF1F5",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ],
+      "expo-status-bar",
+      "expo-sqlite",
+      "expo-image",
+      "expo-background-task",
+      "./plugins/withNotifeeAndroidRepo.js"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
