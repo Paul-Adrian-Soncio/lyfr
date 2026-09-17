@@ -21,8 +21,21 @@ following this list past the point where it stops making sense.
 2. [x] Get the Android version off the tablet — done, see Open questions.
 3. Drizzle schema and first migration, per the data model in `CLAUDE.md`.
    Schema written (`src/db/schema.ts`), migration not yet generated/run.
-4. Occurrence generator as a pure function, with Vitest tests. Fixed daily
-   times, specific weekdays, every N days.
+4. [x] Occurrence generator as a pure function, with Vitest tests. Fixed daily
+   times, specific weekdays, every N days. Done —
+   `src/domain/regimen.ts` + `src/domain/occurrenceGenerator.ts`, 9 tests
+   passing. Two judgment calls worth a second look once real regimens are
+   known (see Open questions):
+   - Regimen `startDate`/`endDate` are local calendar-date strings
+     (`YYYY-MM-DD`), not epoch ms — CLAUDE.md §5 doesn't specify a type for
+     these columns. Chosen to keep "start on this calendar day" unambiguous
+     across timezones.
+   - `every_n_days` anchors the interval to the regimen's own `startDate`,
+     not the generation window's start. So a window that starts mid-cycle
+     still lands on the correct days (confirmed by test). This is the only
+     sane reading, but it means editing a regimen's start date reshuffles
+     every future occurrence date for that rule type — worth surfacing in
+     the UI if edits to an active every-N-days regimen become common.
 5. `Scheduler` interface plus `AndroidScheduler` on Notifee. Prove one exact
    alarm fires through Doze on the unplugged tablet before building anything on
    top of it.
