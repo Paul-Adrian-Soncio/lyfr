@@ -19,8 +19,16 @@ following this list past the point where it stops making sense.
    `expo run:android` installs to the Samsung tablet. Done — see decision log
    and environment notes below for what it took to get there.
 2. [x] Get the Android version off the tablet — done, see Open questions.
-3. Drizzle schema and first migration, per the data model in `CLAUDE.md`.
-   Schema written (`src/db/schema.ts`), migration not yet generated/run.
+3. [x] Drizzle schema and first migration, per the data model in `CLAUDE.md`.
+   Done — `src/db/schema.ts`, migration generated to
+   `src/db/migrations/0000_zippy_molecule_man.sql`, DB client at
+   `src/db/client.ts`, migrations run automatically on launch via
+   `useMigrations` in `app/_layout.tsx`. Confirmed running on the tablet
+   2026-09-18 (app boots past the migration gate, `libexpo-sqlite.so` loads,
+   no errors in logcat). Took real setup beyond `drizzle-kit generate` — see
+   the new gotcha entry below (SQL import resolution needed a Metro resolver
+   change, a Babel plugin, and an explicit `babel-preset-expo` dependency
+   that turned out not to be hoisted).
 4. [x] Occurrence generator as a pure function, with Vitest tests. Fixed daily
    times, specific weekdays, every N days. Done —
    `src/domain/regimen.ts` + `src/domain/occurrenceGenerator.ts`, 9 tests
@@ -29,18 +37,46 @@ following this list past the point where it stops making sense.
    - Regimen `startDate`/`endDate` are local calendar-date strings
      (`YYYY-MM-DD`), not epoch ms — CLAUDE.md §5 doesn't specify a type for
      these columns. Chosen to keep "start on this calendar day" unambiguous
-     across timezones.
+     across timezones. `src/db/schema.ts` initially stored these as epoch-ms
+     `integer` (an oversight predating this decision, not a deliberate
+     choice); fixed 2026-09-18 to `text` so the schema and domain type agree.
    - `every_n_days` anchors the interval to the regimen's own `startDate`,
      not the generation window's start. So a window that starts mid-cycle
      still lands on the correct days (confirmed by test). This is the only
      sane reading, but it means editing a regimen's start date reshuffles
      every future occurrence date for that rule type — worth surfacing in
      the UI if edits to an active every-N-days regimen become common.
-5. `Scheduler` interface — done, `src/scheduling/Scheduler.ts`. Doze/alarm
-   reliability proven via a throwaway spike (`app/doze-spike.tsx`) — see "To
-   verify, not assume". `AndroidScheduler` itself (the real
-   syncRegimen/cancelRegimen/refillWindow/pendingCount implementation on
-   Notifee) not yet built — that's next.
+5. [x] `Scheduler` interface plus `AndroidScheduler` on Notifee. Done —
+   `src/scheduling/Scheduler.ts` + `src/scheduling/AndroidScheduler.ts`.
+   Doze/alarm reliability proven via a throwaway spike (`app/doze-spike.tsx`)
+   — see "To verify, not assume". `AndroidScheduler` itself verified
+   end-to-end on-device 2026-09-18 via another throwaway spike
+   (`app/scheduler-spike.tsx`): a real medication + regimen inserted, synced
+   through `syncRegimen`, produced exactly one `dose_occurrences` row and one
+   real Notifee alarm that fired with sound on schedule. `pendingCount()`
+   correctly reported 1. Design notes:
+   - Idempotency comes from using the `dose_occurrences` row's own UUID as
+     the Notifee notification ID directly, and skipping any generated
+     occurrence whose `(regimenId, scheduledAt)` already has a row. Re-
+     syncing a regimen is therefore a no-op for occurrences already
+     materialised — it does not currently detect or reschedule an occurrence
+     whose *time* changed for a reason other than a brand-new row (e.g. a
+     regimen edit that shifts a still-pending occurrence). Revisit once
+     regimen editing is built.
+   - `refillWindow()` re-syncs every active regimen against a rolling
+     `WINDOW_DAYS = 7` window. Chosen independently of iOS's 64-pending cap
+     (Android has no such cap) — just a sane default so an edited regimen's
+     new rule takes effect within a week rather than being blocked by a
+     month of stale occurrences. Worth revisiting once real regimens (and
+     real re-sync frequency — on app foreground? a background task?) are
+     known.
+   - Found via the spike, not assumed: `crypto.randomUUID()` is **not**
+     globally available in this Expo SDK 57 / RN 0.86 / Hermes setup —
+     threw `property 'crypto' doesn't exist`. Fixed by installing
+     `expo-crypto` and using `Crypto.randomUUID()` instead. Worth remembering
+     since RN release notes have flagged Hermes-global `crypto.randomUUID`
+     support before; it evidently isn't enabled/available here, so don't
+     assume it without testing on a fresh setup.
 6. Heartbeat logging, then the Samsung battery walkthrough.
 7. Medication library UI, then Today view, then history.
 
@@ -250,6 +286,47 @@ Two independent things can cause this and both need checking:
 up wake lock!` in this state — a useful signal that the activity launched
 natively but React Native never finished mounting, pointing at the JS bundle
 never arriving rather than a native crash.
+
+### Windows gotcha: Drizzle's generated migrations.js needs Metro + Babel setup, not just drizzle-kit
+
+`drizzle-kit generate` (config: `driver: "expo"`) produces
+`src/db/migrations/migrations.js`, which does `import m0000 from
+'./0000_..._man.sql'` — a raw `.sql` file import. Out of the box, Metro
+doesn't know what to do with that, and simply adding the extension to
+`resolver.sourceExts` in `metro.config.js` makes Metro resolve the file but
+then try to parse its contents as JavaScript (`SyntaxError: Missing
+semicolon`), since resolving and transforming are separate steps.
+
+Full fix, three parts:
+1. `metro.config.js` — add `"sql"` to `config.resolver.sourceExts`, so Metro
+   is willing to resolve the import at all.
+2. `babel.config.js` — add the `babel-plugin-inline-import` plugin
+   (`{ extensions: [".sql"] }`), which is what actually inlines the file's
+   raw text as a JS string at build time. Needed devDependency:
+   `babel-plugin-inline-import`.
+3. Adding a custom `babel.config.js` for the first time (there wasn't one
+   before) meant Metro no longer used Expo's implicit default Babel config —
+   ours has to include `presets: ["babel-preset-expo"]` explicitly, and that
+   package turned out to only exist nested inside
+   `node_modules/expo/node_modules/babel-preset-expo`, not hoisted to the
+   project root. Metro's Babel transformer resolves presets from the project
+   root, so it silently failed to construct a transformer at all
+   (`Cannot find module 'babel-preset-expo'`) — surfaced as a confusing,
+   unrelated-looking `Bundler.js` crash (`Cannot read properties of
+   undefined (reading 'transformFile')`) with the real cause only visible a
+   few lines earlier in the log as `Failed to construct transformer:`.
+   Fixed by adding `babel-preset-expo` as an explicit devDependency.
+
+Lesson for next time something looks like an unrelated Metro internals crash:
+grep the log for `Failed to construct transformer` before chasing the
+stack trace that's actually printed last — Metro's Bundler swallows that
+construction error into a state that surfaces much later as a confusing
+`undefined` crash on the next bundle request.
+
+Also: any change to `metro.config.js` or `babel.config.js` requires a full
+Metro restart (`expo start --clear`), not just a JS reload — Metro doesn't
+hot-reload its own config, and stale per-file transform caches can mask
+whether a fix actually worked.
 
 ### Environment setup performed this session (Windows, user-level)
 

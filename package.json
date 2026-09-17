@@ -20,6 +20,7 @@
     "drizzle-orm": "^0.45.2",
     "expo": "^57.0.23",
     "expo-background-task": "~57.0.18",
+    "expo-crypto": "~57.0.3",
     "expo-file-system": "~57.0.7",
     "expo-image": "~57.0.5",
     "expo-image-manipulator": "~57.0.18",
@@ -41,6 +42,8 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
     "@types/react": "^19.3.0",
+    "babel-plugin-inline-import": "^3.0.0",
+    "babel-preset-expo": "^57.0.12",
     "drizzle-kit": "^0.31.10",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"

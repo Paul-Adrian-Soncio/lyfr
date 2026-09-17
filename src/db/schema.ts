@@ -30,8 +30,10 @@ export const regimens = sqliteTable("regimens", {
     .references(() => medications.id),
   ruleType: text("rule_type").notNull(),
   ruleConfig: text("rule_config", { mode: "json" }).notNull(),
-  startDate: integer("start_date").notNull(),
-  endDate: integer("end_date"),
+  // Local calendar dates (YYYY-MM-DD), not epoch ms — see src/domain/regimen.ts.
+  // A regimen's start/end is a calendar-day concept, not an instant.
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at")
     .notNull()

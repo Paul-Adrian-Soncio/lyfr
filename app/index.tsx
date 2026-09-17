@@ -16,6 +16,11 @@ export default function TodayScreen() {
           Doze spike (dev)
         </Text>
       </Link>
+      <Link href="/scheduler-spike">
+        <Text allowFontScaling style={styles.link}>
+          Scheduler spike (dev)
+        </Text>
+      </Link>
     </View>
   );
 }
