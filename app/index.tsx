@@ -1,3 +1,4 @@
+import { Link } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { light, typography } from "@/theme/tokens";
 
@@ -10,6 +11,11 @@ export default function TodayScreen() {
       <Text allowFontScaling style={styles.body}>
         Today view goes here.
       </Text>
+      <Link href="/doze-spike">
+        <Text allowFontScaling style={styles.link}>
+          Doze spike (dev)
+        </Text>
+      </Link>
     </View>
   );
 }
@@ -30,5 +36,10 @@ const styles = StyleSheet.create({
   body: {
     fontSize: typography.bodyMinSp,
     color: light.text,
+  },
+  link: {
+    fontSize: typography.bodyMinSp,
+    color: light.text,
+    textDecorationLine: "underline",
   },
 });

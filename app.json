@@ -24,7 +24,9 @@
         "POST_NOTIFICATIONS",
         "SCHEDULE_EXACT_ALARM",
         "USE_EXACT_ALARM",
-        "RECEIVE_BOOT_COMPLETED"
+        "RECEIVE_BOOT_COMPLETED",
+        "USE_FULL_SCREEN_INTENT",
+        "WAKE_LOCK"
       ],
       "predictiveBackGestureEnabled": false
     },

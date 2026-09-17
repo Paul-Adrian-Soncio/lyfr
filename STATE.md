@@ -9,7 +9,7 @@ a commitment. If the work suggests a better sequence, say so rather than
 following this list past the point where it stops making sense.
 
 **Last updated:** 2026-09-17
-**Phase:** scaffolded — Expo dev build running on the Samsung tablet
+**Phase:** Doze/notification reliability proven; building the real `AndroidScheduler` next
 
 ---
 
@@ -36,9 +36,11 @@ following this list past the point where it stops making sense.
      sane reading, but it means editing a regimen's start date reshuffles
      every future occurrence date for that rule type — worth surfacing in
      the UI if edits to an active every-N-days regimen become common.
-5. `Scheduler` interface plus `AndroidScheduler` on Notifee. Prove one exact
-   alarm fires through Doze on the unplugged tablet before building anything on
-   top of it.
+5. `Scheduler` interface — done, `src/scheduling/Scheduler.ts`. Doze/alarm
+   reliability proven via a throwaway spike (`app/doze-spike.tsx`) — see "To
+   verify, not assume". `AndroidScheduler` itself (the real
+   syncRegimen/cancelRegimen/refillWindow/pendingCount implementation on
+   Notifee) not yet built — that's next.
 6. Heartbeat logging, then the Samsung battery walkthrough.
 7. Medication library UI, then Today view, then history.
 
@@ -92,7 +94,33 @@ real device and record the result here.
 
 - [ ] Notifee reschedules trigger notifications after reboot. Actually reboot the
       tablet and confirm alarms return.
-- [ ] Exact alarms fire through Doze on the unplugged tablet with the screen off.
+- [x] Exact alarms fire through Doze on the unplugged tablet with the screen off,
+      *and* the resulting notification is actually noticeable on a locked
+      screen. Confirmed 2026-09-17 via a throwaway spike screen
+      (`app/doze-spike.tsx`):
+      - `AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE` fired on schedule with the
+        tablet locked and unplugged from USB for 15 minutes — the OS-level
+        alarm mechanism survives Doze.
+      - With ringer on and lock-screen notifications enabled, the notification
+        played sound and appeared on the lock screen — matches CLAUDE.md §6's
+        actual requirement (high-importance channel, alarm-category sound).
+      - **Gotcha:** Notifee channel settings (sound, vibration, visibility)
+        cannot be changed after the channel is first created — Android
+        silently ignores updates. An early test created a channel with no
+        sound configured, and every subsequent test on that channel ID stayed
+        silent regardless of system-settings toggles, until the code used a
+        new channel ID. If a real device's notifications ever seem stuck on
+        old behaviour after a channel-config change, this is why — bump the
+        channel ID rather than debugging system settings.
+      - **Screen-wake was tried and explicitly dropped as out of scope.**
+        `SET_ALARM_CLOCK` + `AndroidCategory.ALARM` + `fullScreenAction` +
+        the `USE_FULL_SCREEN_INTENT` manifest permission still did not turn
+        the screen on on this Samsung tablet. This matches known,
+        widely-reported OEM behaviour — Samsung suppresses forced screen-wake
+        for third-party apps even with every relevant flag set, generally
+        reserving it for the system Clock app. CLAUDE.md §6 does not require
+        screen-wake, only sound + high importance, so this was not pursued
+        further. Do not re-attempt this without a specific reason.
 - [ ] Notification actions (Taken, Snooze, Skip) work from the lock screen
       without unlocking.
 - [ ] The app survives several days unopened without Samsung's unused-app sleep
@@ -200,6 +228,28 @@ registered in `app.json`, which patches `android/build.gradle`'s
 path. Necessary because `android/` is regenerated (and git-ignored) — a
 manual edit to `build.gradle` would be silently lost on the next
 `expo prebuild --clean`.
+
+### Windows gotcha: app stuck on white splash screen means Metro isn't reachable
+
+`expo run:android` starts its own Metro instance as part of the build, but
+that instance dies with the build's background process once the command
+finishes — it does not keep running the way a separate `expo start` does. If
+the app is later force-stopped and relaunched (e.g. via `adb shell monkey`)
+without a live Metro server, it hangs on the native splash screen
+indefinitely — no crash, no error, just white.
+
+Two independent things can cause this and both need checking:
+1. No Metro process is actually running — start one with `expo start`.
+2. `adb reverse tcp:8081 tcp:8081` is missing or was dropped. This forwards
+   the device's view of `localhost:8081` to the PC's Metro server over USB,
+   and it does not survive an adb server restart (which MirrorService causes
+   often — see above). Re-run it after any adb server restart, before
+   relaunching the app.
+
+`adb logcat` showed `ActivityTaskManager: Launch timeout has expired, giving
+up wake lock!` in this state — a useful signal that the activity launched
+natively but React Native never finished mounting, pointing at the JS bundle
+never arriving rather than a native crash.
 
 ### Environment setup performed this session (Windows, user-level)
 
