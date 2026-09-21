@@ -77,8 +77,55 @@ following this list past the point where it stops making sense.
      since RN release notes have flagged Hermes-global `crypto.randomUUID`
      support before; it evidently isn't enabled/available here, so don't
      assume it without testing on a fresh setup.
-6. Heartbeat logging, then the Samsung battery walkthrough.
-7. Medication library UI, then Today view, then history.
+6. [x] Heartbeat logging. Done —
+   `src/scheduling/heartbeat.ts` (logExpectedFire/logObservedFire/reconcile),
+   `src/scheduling/notificationEvents.ts` (Notifee event wiring),
+   `src/scheduling/backgroundHeartbeat.ts` (periodic WorkManager-backed
+   check via expo-task-manager/expo-background-task), custom `index.js`
+   entry point (needed so the Notifee background handler and the
+   TaskManager task are both defined before the JS bundle finishes
+   initializing), `src/ui/reliabilityStore.ts` +
+   `src/ui/ReliabilityBanner.tsx` (the missed-fire banner, wired into
+   `app/_layout.tsx`). Verified end-to-end on-device 2026-09-18/19 via the
+   scheduler-spike screen's new "Check reconcile()" button. Two real bugs
+   found by testing, not assumed away:
+   - **POST_NOTIFICATIONS was silently ungranted.** The uninstall/reinstall
+     done earlier (to wipe test data) reset the runtime permission grant,
+     and `AndroidScheduler.syncRegimen` never re-requests it — only the
+     doze-spike screen's `notifee.requestPermission()` call does. Result:
+     `createTriggerNotification` succeeded (no thrown error) and a
+     `dose_occurrences` row was created, but the OS never actually posted
+     anything — `dumpsys notification` showed
+     `AppSettings: ph.pauladrian.lyfr importance=NONE` and
+     `numEnqueuedByApp=0`. Fixed 2026-09-19: `syncRegimen` now calls
+     `notifee.requestPermission()` first and throws
+     `NotificationPermissionDeniedError` if denied, rather than silently
+     writing occurrence rows for notifications that will never appear.
+     **Still open:** no real UI calls `syncRegimen` yet, so nothing catches
+     or surfaces this error to a user. Needs a real decision once
+     onboarding/medication-library UI exists — this app is useless without
+     notification permission, so denial should probably block past
+     onboarding with a clear explanation, not just fail silently deep in a
+     background sync call.
+   - **Notifee foreground and background event listeners are separate
+     registrations.** `notifee.onBackgroundEvent` (registered once in
+     `index.js`, outside the component tree) only catches events while the
+     app is not in the foreground. With the app open, a real, successfully
+     delivered notification produced zero `DELIVERED` events — reconcile()
+     correctly flagged it as a suspected miss, which is the right behaviour
+     for missing data, but the actual gap was a missing
+     `notifee.onForegroundEvent` registration. Fixed by adding
+     `registerForegroundEventHandler()` in
+     `src/scheduling/notificationEvents.ts`, called from a `useEffect` in
+     `app/_layout.tsx`. Confirmed fixed: a subsequent in-foreground test
+     showed up as "confirmed" rather than a suspected miss.
+   - Two stale suspected-miss rows from before these fixes are still sitting
+     in the dev database (from tests run while permission was revoked) and
+     will keep showing the reliability banner until the dev DB is wiped
+     again. This is correct behaviour, not a bug — the log doesn't
+     retroactively un-flag a real miss.
+7. Samsung battery walkthrough. Next up.
+8. Medication library UI, then Today view, then history.
 
 Do not build the UI first. The scheduling layer is where the project succeeds or
 fails, and it is better to discover its constraints before screens depend on it.

@@ -12,6 +12,7 @@ import notifee, {
   AndroidCategory,
   AndroidImportance,
   AndroidVisibility,
+  AuthorizationStatus,
   TriggerType,
 } from "@notifee/react-native";
 import { eq } from "drizzle-orm";
@@ -20,6 +21,7 @@ import { db } from "@/db/client";
 import { doseOccurrences, medications, regimens } from "@/db/schema";
 import { generateOccurrences } from "@/domain/occurrenceGenerator";
 import type { Regimen, RuleConfig } from "@/domain/regimen";
+import { logExpectedFire } from "./heartbeat";
 import type { Scheduler } from "./Scheduler";
 
 const REMINDER_CHANNEL_ID = "dose-reminders-v1";
@@ -30,6 +32,24 @@ const REMINDER_CHANNEL_ID = "dose-reminders-v1";
 // is reflected promptly rather than having a month of stale occurrences
 // scheduled against the old rule.
 const WINDOW_DAYS = 7;
+
+// Thrown when the OS notification permission is denied. Without this,
+// syncRegimen previously wrote dose_occurrences and called
+// createTriggerNotification "successfully" while POST_NOTIFICATIONS was
+// revoked — Notifee does not itself throw for this, and the OS silently
+// drops the notification. Found on-device 2026-09-18/19; see STATE.md.
+export class NotificationPermissionDeniedError extends Error {
+  constructor() {
+    super("Notification permission was denied — reminders will not be delivered.");
+  }
+}
+
+async function ensurePermission(): Promise<void> {
+  const settings = await notifee.requestPermission();
+  if (settings.authorizationStatus === AuthorizationStatus.DENIED) {
+    throw new NotificationPermissionDeniedError();
+  }
+}
 
 async function ensureChannel(): Promise<void> {
   await notifee.createChannel({
@@ -93,6 +113,7 @@ async function scheduleOccurrenceNotification(
 
 export const AndroidScheduler: Scheduler = {
   async syncRegimen(regimen: Regimen): Promise<void> {
+    await ensurePermission();
     await ensureChannel();
 
     const medication = await db.query.medications.findFirst({
@@ -143,6 +164,8 @@ export const AndroidScheduler: Scheduler = {
         .update(doseOccurrences)
         .set({ actualNotificationId: inserted.id })
         .where(eq(doseOccurrences.id, inserted.id));
+
+      await logExpectedFire(inserted.id, inserted.scheduledAt, REMINDER_CHANNEL_ID);
     }
   },
 

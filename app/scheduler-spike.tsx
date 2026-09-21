@@ -12,6 +12,7 @@ import { db } from "@/db/client";
 import { doseOccurrences, medications, regimens } from "@/db/schema";
 import type { Regimen } from "@/domain/regimen";
 import { AndroidScheduler } from "@/scheduling/AndroidScheduler";
+import { reconcile } from "@/scheduling/heartbeat";
 import { light, typography } from "@/theme/tokens";
 
 export default function SchedulerSpikeScreen() {
@@ -85,6 +86,22 @@ export default function SchedulerSpikeScreen() {
     }
   }
 
+  async function runReconcile() {
+    try {
+      const result = await reconcile();
+      append(
+        `reconcile() -> ${result.suspectedMisses.length} suspected misses, ${result.confirmed} confirmed`
+      );
+      for (const miss of result.suspectedMisses) {
+        append(
+          `  MISS occurrenceId=${miss.occurrenceId.slice(0, 8)} expectedFireAt=${new Date(miss.expectedFireAt).toLocaleTimeString()}`
+        );
+      }
+    } catch (e) {
+      append(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Text allowFontScaling style={styles.title}>
@@ -95,6 +112,7 @@ export default function SchedulerSpikeScreen() {
         it through AndroidScheduler, and reports what happened.
       </Text>
       <Button title="Run test" onPress={runTest} />
+      <Button title="Check reconcile()" onPress={runReconcile} />
       {log.map((line, i) => (
         <Text allowFontScaling key={i} style={styles.logLine}>
           {line}
