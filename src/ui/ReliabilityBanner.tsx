@@ -1,14 +1,11 @@
 // The missed-fire banner. See CLAUDE.md §3: "If fires are being missed,
 // show a persistent banner: reminders may not be working on this device,
 // with a button back into the battery settings walkthrough."
-//
-// The button below calls Notifee's power-manager settings directly as a
-// placeholder — replace with a link into the real walkthrough screen once
-// that exists (STATE.md's next step after this one).
 
-import notifee from "@notifee/react-native";
+import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { doseStatus } from "@/theme/tokens";
+import Svg, { Path } from "react-native-svg";
+import { doseStatus, typography } from "@/theme/tokens";
 import { useReliabilityStore } from "./reliabilityStore";
 
 export function ReliabilityBanner() {
@@ -18,13 +15,14 @@ export function ReliabilityBanner() {
 
   return (
     <View style={styles.banner}>
-      <Text allowFontScaling style={styles.icon}>
-        !
-      </Text>
+      <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <Path d="M12 6 V13" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round" />
+        <Path d="M12 18 V18.1" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round" />
+      </Svg>
       <Text allowFontScaling style={styles.text}>
         Reminders may not be working on this device.
       </Text>
-      <Pressable onPress={() => notifee.openPowerManagerSettings()}>
+      <Pressable onPress={() => router.push("/battery-walkthrough")}>
         <Text allowFontScaling style={styles.link}>
           Check settings
         </Text>
@@ -37,25 +35,20 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
     backgroundColor: doseStatus.missed.fill,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  icon: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 18,
-  },
   text: {
     color: "white",
     flex: 1,
-    fontSize: 16,
+    fontSize: typography.absoluteMinSp,
   },
   link: {
     color: "white",
     fontWeight: "700",
     textDecorationLine: "underline",
-    fontSize: 16,
+    fontSize: typography.absoluteMinSp,
   },
 });

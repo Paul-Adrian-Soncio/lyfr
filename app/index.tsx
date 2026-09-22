@@ -21,6 +21,11 @@ export default function TodayScreen() {
           Scheduler spike (dev)
         </Text>
       </Link>
+      <Link href="/battery-walkthrough">
+        <Text allowFontScaling style={styles.link}>
+          Battery walkthrough (dev)
+        </Text>
+      </Link>
     </View>
   );
 }

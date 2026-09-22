@@ -124,8 +124,57 @@ following this list past the point where it stops making sense.
      will keep showing the reliability banner until the dev DB is wiped
      again. This is correct behaviour, not a bug — the log doesn't
      retroactively un-flag a real miss.
-7. Samsung battery walkthrough. Next up.
+7. [x] Samsung battery walkthrough. Done —
+   `src/scheduling/batteryWalkthrough.ts` (the checks/actions, mapped onto
+   Notifee's `isBatteryOptimizationEnabled`/`openBatteryOptimizationSettings`,
+   `openAlarmPermissionSettings`, and `getPowerManagerInfo`/
+   `openPowerManagerSettings` for the Samsung-specific OEM screen),
+   `app/battery-walkthrough.tsx` (the screen — re-checks step status via
+   `AppState` on foreground, so returning from a settings screen updates the
+   badges without a manual refresh). Reachable from the home screen's dev
+   links and wired as the reliability banner's "Check settings" destination
+   (`src/ui/ReliabilityBanner.tsx`, via `router.push`). Restyled to match
+   the real mockup (see "Design system" below) rather than ad-hoc styling.
+   Verified on-device 2026-09-22, one real UX gap found and fixed:
+   - **`openBatteryOptimizationSettings()` opens a filtered app list, not a
+     Lyfr-specific screen.** On the Samsung tablet, the destination screen
+     defaults to a subset filter that does not include Lyfr — the user has
+     to know to switch it to "All apps" before Lyfr even appears in the
+     list. Without saying so, a first-time user hits what looks like a dead
+     end (their app isn't there) and has no obvious next step. Fixed by
+     making the walkthrough's own description say this explicitly, since
+     the OS screen doesn't. This is very likely Samsung/One-UI-version-
+     specific — re-verify if the target phone runs a different One UI
+     version than the test tablet.
+   - The other two steps (`exactAlarmStep`, `oemPowerManagerStep`) are not
+     programmatically checkable — Notifee has no status API for them, only
+     an action to open the screen. Their badges always show "Check
+     manually." Not yet separately verified that
+     `openPowerManagerSettings()` on this tablet actually lands on
+     Samsung's "Background usage limits" screen specifically (vs. a more
+     generic battery page) — confirmed reachable and functional per user
+     report, but the exact destination screen hasn't been screenshotted/
+     logged. Worth a closer look before relying on the walkthrough's
+     description text being accurate for that step too.
 8. Medication library UI, then Today view, then history.
+
+### Design system
+
+A real mockup exists — see the "Lyfr app mockup" design canvas (Main,
+LockScreen, AddMedication, History artboards), read into this session
+2026-09-22 and used as the source of truth for `battery-walkthrough.tsx`
+and `ReliabilityBanner.tsx`. `src/theme/tokens.ts` was extended to capture
+what CLAUDE.md §7 doesn't spell out but the mockup makes concrete:
+`textMuted` colours (`#3D5163` light / `#A9BACB` dark), a distinct dark
+card surface (`#1A2A38`) separate from the base dark surface, card/button/
+pill border-radius and height conventions (`radii`, `buttonHeights`), and
+the wordmark font family. The L-monogram logo (CLAUDE.md §7) is extracted
+as `src/ui/LyfrLogo.tsx`, an inline `react-native-svg` component matching
+the mockup's exact path data, reused wherever the mark appears rather than
+redrawn per screen. New screens should read the mockup's other artboards
+(Main/LockScreen/AddMedication/History) before inventing new component
+patterns — check `src/theme/tokens.ts`'s component-convention comments
+first.
 
 Do not build the UI first. The scheduling layer is where the project succeeds or
 fails, and it is better to discover its constraints before screens depend on it.

@@ -1,5 +1,9 @@
 // Design tokens. See CLAUDE.md §7 for rationale — do not add colours here
 // without checking the contrast and colourblind-safety notes there first.
+//
+// Extended 2026-09-22 to match the real mockup (Main/LockScreen/
+// AddMedication/History), which is the source of truth for component
+// conventions from here on — see the notes below each token group.
 
 export const brand = {
   rime: "#EDF1F5",
@@ -32,8 +36,14 @@ export const medicationTags = [
 export const dark = {
   background: "#0B1620",
   surface: "#14212C",
+  // The mockup's LockScreen uses a distinct, slightly lighter card surface
+  // than the base dark surface above — #1A2A38, for a card sitting on top
+  // of the dark background (e.g. the lock-screen reminder card).
+  cardSurface: "#1A2A38",
   border: "#263644",
   text: "#E6EDF4",
+  // Secondary/muted text on dark surfaces (timestamps, captions).
+  textMuted: "#A9BACB",
   accent: brand.fjord,
 } as const;
 
@@ -42,6 +52,10 @@ export const light = {
   surface: "#FFFFFF",
   border: brand.frost,
   text: brand.woad,
+  // Secondary/muted text on light surfaces — subtitles, metadata, dates.
+  // Used far more often in the mockup than pure `text` for anything that
+  // isn't a heading or primary label.
+  textMuted: "#3D5163",
   accent: brand.deep,
 } as const;
 
@@ -49,4 +63,30 @@ export const typography = {
   bodyMinSp: 18,
   medicationNameMinSp: 22,
   absoluteMinSp: 16,
+  // The wordmark ("lyfr") uses Manrope bold, splash/about screens only —
+  // see CLAUDE.md §7. Everything else stays on the system font.
+  wordmarkFontFamily: "Manrope",
 } as const;
+
+// Component conventions observed across the mockup — not enforced by types,
+// but new screens should match these rather than inventing new values.
+export const radii = {
+  card: 16,
+  cardLarge: 24, // hero/section cards, e.g. the Today "Next dose" card
+  button: 14,
+  buttonLarge: 16,
+  pill: 999, // status badges, chips
+} as const;
+
+export const buttonHeights = {
+  standard: 56,
+  primary: 60, // full-width primary CTA, e.g. "Next: set schedule"
+} as const;
+
+// Primary button: solid `accent` fill, white text, bold 700.
+// Secondary/outline button: 2px solid `brand.fjord` border, transparent
+// background, text colour matches context (dark text on light, white on
+// dark surfaces).
+// Status badge/pill: `radii.pill`, padding 6px 10px, icon + label together.
+// Solid fill for negative/attention states (missed, amber #9A4E06 — never
+// red, see CLAUDE.md §7), 2px outline for neutral/upcoming states.
