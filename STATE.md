@@ -8,8 +8,8 @@ Everything in both files is subject to change. The ordering below is a plan, not
 a commitment. If the work suggests a better sequence, say so rather than
 following this list past the point where it stops making sense.
 
-**Last updated:** 2026-09-17
-**Phase:** Doze/notification reliability proven; building the real `AndroidScheduler` next
+**Last updated:** 2026-09-23
+**Phase:** Scheduling + reliability layer proven end-to-end; medication library UI underway
 
 ---
 
@@ -156,7 +156,55 @@ following this list past the point where it stops making sense.
      report, but the exact destination screen hasn't been screenshotted/
      logged. Worth a closer look before relying on the walkthrough's
      description text being accurate for that step too.
-8. Medication library UI, then Today view, then history.
+8. Medication library UI, then Today view, then history. In progress —
+   "Add medicine" done (`app/add-medication.tsx`), matching the mockup's
+   AddMedication.dc.html extended to 9 forms (added "Vitamin", see decision
+   log — the mockup and CLAUDE.md §5's table only show/list 8). Supporting
+   pieces: `src/domain/medication.ts` (form → dose unit/supply unit table),
+   `src/domain/medicationPhoto.ts` (camera capture → resize to 800px long
+   edge → save to document directory, only the relative path stored — per
+   CLAUDE.md §5), `src/ui/FormIcon.tsx` (per-form icon set; 6 of 9 traced
+   from the mockup exactly, 3 — patch/topical/vitamin — designed to match
+   since no mockup reference exists for them, see file comments). Verified
+   end-to-end on-device 2026-09-23: photo captured and shown in the
+   preview, medication row written correctly (confirmed by pulling and
+   querying the live SQLite file — see verification method below), photo
+   file present on disk at the stored relative path, correct size for an
+   800px-downscaled JPEG (~7KB).
+   - Medication list/library screen (browsing what's been added, edit,
+     archive) not yet built — only the add flow exists so far.
+   - No second "set schedule" step yet — CLAUDE.md §6 and the mockup both
+     treat scheduling as a distinct step after adding a medication
+     ("Step 1 of 2" / "Next: set schedule"). `add-medication.tsx` currently
+     saves and returns straight to the previous screen. Needs a real
+     decision once regimen-creation UI exists: does saving a medication
+     immediately continue into schedule setup, or can a medication exist
+     without an active regimen for a while (e.g. PRN, or "add now, schedule
+     later")?
+
+### Verifying a real device's SQLite database from this PC
+
+Useful for confirming a write actually landed, not just that no error was
+thrown. `run-as` can access the app's private data directory, but two
+Windows/Git-Bash-specific gotchas will otherwise waste time:
+
+- Plain `adb shell run-as <pkg> cat <path> > file` can come back
+  corrupted/truncated — seen 2026-09-23, `sqlite3` reported "malformed
+  database schema" on a pull that used a plain `adb shell ... cat`
+  redirect. Use `adb exec-out` instead of `adb shell` for any binary pull
+  — `exec-out` doesn't do the CRLF/text-mode translation `shell` can.
+- Git Bash on Windows rewrites a leading `/data/...` argument into a
+  Windows path (`C:/Program Files/Git/data/...`) before `adb` ever sees
+  it, silently turning a valid device-absolute path into a nonexistent
+  local one. Prefix the command with `MSYS_NO_PATHCONV=1` to stop that
+  rewrite:
+  ```
+  MSYS_NO_PATHCONV=1 adb exec-out run-as ph.pauladrian.lyfr \
+    cat /data/data/ph.pauladrian.lyfr/files/SQLite/lyfr.db > local_copy.db
+  sqlite3 local_copy.db "SELECT * FROM medications;"
+  ```
+  `sqlite3` itself is already on this machine, bundled with the Android
+  SDK at `platform-tools/sqlite3`.
 
 ### Design system
 
@@ -279,6 +327,7 @@ Reversals go here with a reason, so the history is visible.
 | — | Local-only in V1, no server | Reminders must work offline; health data on a server brings obligations not worth taking on in week one |
 | — | Name: Lyfr | Old Norse *lyf*, medicine. Short, fits an icon label, avoids the Lyft collision better than bare "Lyf" |
 | — | Nordic blue palette | Steady and reliable over clinical; see `CLAUDE.md` §7 |
+| 2026-09-23 | Added "Vitamin" as a 9th medication form, alongside the 8 in `CLAUDE.md` §5's table | Target users (§1) are likely taking supplements alongside prescriptions; a distinct form lets the medicine list visually separate them. Behaves like tablet/capsule (count-based dosing) — see `src/domain/medication.ts`. |
 
 ---
 
@@ -382,6 +431,19 @@ Two independent things can cause this and both need checking:
 up wake lock!` in this state — a useful signal that the activity launched
 natively but React Native never finished mounting, pointing at the JS bundle
 never arriving rather than a native crash.
+
+**A third cause, found 2026-09-23:** a previous `expo start`/`expo run:android`
+background process can leave an orphaned `node.exe` still bound to port
+8081 after being killed (via `TaskStop` or similar), even though it no
+longer serves anything useful. A fresh `expo start` then fails outright
+(`Port 8081 is being used by another process` — non-interactive mode can't
+answer the "use port 8082 instead?" prompt, so it just skips starting the
+dev server, silently). Symptom on the PC side beforehand: a plain
+`curl localhost:8081/status` hangs indefinitely rather than returning
+quickly, which is the tell that something dead is squatting on the port
+rather than Metro being merely unreachable from the device. Fix: find and
+kill it — `Get-NetTCPConnection -LocalPort 8081` → `Stop-Process` (or
+`taskkill /F /PID`) — then start Metro again.
 
 ### Windows gotcha: Drizzle's generated migrations.js needs Metro + Babel setup, not just drizzle-kit
 

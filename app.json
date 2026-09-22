@@ -44,6 +44,12 @@
       "expo-sqlite",
       "expo-image",
       "expo-background-task",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Lyfr uses the camera to photograph medication packaging, so it's easier to recognise."
+        }
+      ],
       "./plugins/withNotifeeAndroidRepo.js"
     ],
     "experiments": {
