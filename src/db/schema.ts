@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const medications = sqliteTable("medications", {
@@ -81,3 +81,30 @@ export const notificationLog = sqliteTable("notification_log", {
   channel: text("channel"),
   platform: text("platform").notNull(),
 });
+
+export const medicationsRelations = relations(medications, ({ many }) => ({
+  regimens: many(regimens),
+}));
+
+export const regimensRelations = relations(regimens, ({ one, many }) => ({
+  medication: one(medications, {
+    fields: [regimens.medicationId],
+    references: [medications.id],
+  }),
+  occurrences: many(doseOccurrences),
+}));
+
+export const doseOccurrencesRelations = relations(doseOccurrences, ({ one, many }) => ({
+  regimen: one(regimens, {
+    fields: [doseOccurrences.regimenId],
+    references: [regimens.id],
+  }),
+  edits: many(doseEdits),
+}));
+
+export const doseEditsRelations = relations(doseEdits, ({ one }) => ({
+  occurrence: one(doseOccurrences, {
+    fields: [doseEdits.occurrenceId],
+    references: [doseOccurrences.id],
+  }),
+}));

@@ -189,14 +189,79 @@ following this list past the point where it stops making sense.
      regardless of whether a photo exists. Worth checking the Today view
      and any future medication display for the same mistake once those are
      built.
-   - No second "set schedule" step yet — CLAUDE.md §6 and the mockup both
-     treat scheduling as a distinct step after adding a medication
-     ("Step 1 of 2" / "Next: set schedule"). `add-medication.tsx` currently
-     saves and returns straight to the previous screen. Needs a real
-     decision once regimen-creation UI exists: does saving a medication
-     immediately continue into schedule setup, or can a medication exist
-     without an active regimen for a while (e.g. PRN, or "add now, schedule
-     later")?
+   - [x] "Set schedule" step — done, 2026-09-24.
+     `app/schedule-medication/[medicationId].tsx` (create, chained
+     directly from `add-medication.tsx`'s "Next: set schedule" button,
+     matching the mockup's "Step 1 of 2" framing exactly — confirmed via
+     the mockup file that this was the original two-screen design, not a
+     new decision) and `app/edit-schedule/[medicationId].tsx` (edit,
+     linked from `edit-medication/[id].tsx`'s new "Edit schedule" button).
+     Shared rule-type/time/weekday/interval/date fields extracted to
+     `src/ui/ScheduleFormFields.tsx`. V1 assumes one active regimen per
+     medication — see that file's header comment for what would need to
+     change if that assumption breaks later.
+   - **Custom time picker** (`src/ui/TimeStepper.tsx`): stepper buttons for
+     hour/minute plus a large AM/PM toggle, deliberately not a scroll/drag
+     wheel — discrete taps are more reliable than a drag gesture for users
+     with reduced dexterity or tremor (CLAUDE.md's open question on this).
+     Explicitly built to a usability bar set by the native OS time picker
+     it replaces (large targets, separate AM/PM control, tabular numerals)
+     — revisit the native picker if this doesn't hold up in practice.
+   - **Real bug found and fixed 2026-09-24, via on-device testing of an
+     actual edit:** `AndroidScheduler.syncRegimen`'s idempotency check
+     matched existing `dose_occurrences` rows by `scheduledAt` alone,
+     regardless of status. `cancelRegimen` (used when editing a schedule)
+     marks old rows `"cancelled"` rather than deleting them — so if an
+     edited regimen's new rule happened to produce a `scheduledAt` that
+     coincided with one of the old, now-cancelled rows (e.g. old rule fired
+     at 20:00 *and* 21:00 daily, new rule fires at 21:00 daily — every new
+     occurrence collided with an old cancelled one), `syncRegimen` treated
+     every single new occurrence as "already handled" and inserted
+     nothing. No error was thrown; the save appeared to succeed while
+     silently producing zero reminders. Confirmed by pulling the live
+     device DB and comparing timestamps directly — the bug was invisible
+     from the UI alone. Fixed by filtering the idempotency map to only
+     `status === "upcoming"` rows before checking for a collision.
+     **Lesson:** any time occurrence rows are left behind with a non-active
+     status (cancelled, or later skipped/missed), collision checks against
+     "does a row exist at this time" must also check whether that row is
+     still live — a `dose_occurrences` row existing is not the same as it
+     being current.
+   - [x] Today view — done, 2026-09-24. `app/index.tsx` now matches the
+     mockup's Main.dc.html: logo/date header, add button, per-dose progress
+     bar, hero "Next dose" card with Taken/Snooze/Skip, and a "Later today"
+     list. Backed by `src/scheduling/todayOccurrences.ts` (a reactive
+     `useLiveQuery`-compatible query joining `dose_occurrences` →
+     `regimens` → `medications` via Drizzle relations, newly added to
+     `src/db/schema.ts` — first time this project has used `with:` joins
+     rather than flat `findFirst`/`findMany`) and
+     `src/scheduling/doseActions.ts` (markTaken/markSkipped/snooze).
+     Notes and one open decision:
+   - `AndroidScheduler.scheduleOccurrenceNotification` and
+     `REMINDER_CHANNEL_ID` are now exported so `doseActions.ts`'s `snooze`
+     can reuse them directly rather than reimplementing notification
+     creation a second time — avoids the two drifting apart. `Scheduler`
+     stays narrow per CLAUDE.md §3; snooze is a one-off single-occurrence
+     reschedule, not a cross-cutting scheduling concern, so it doesn't
+     belong on that interface.
+   - Snooze is a fixed 10 minutes, hardcoded in `doseActions.ts`. Not
+     user-configurable yet — CLAUDE.md doesn't specify a snooze duration.
+   - **UX decision, 2026-09-24:** tapping "Taken" on a dose whose scheduled
+     time hasn't arrived yet is allowed, but requires an explicit
+     confirmation dialog first ("Mark as taken early?") rather than either
+     silently accepting it or blocking it outright. Raised by on-device
+     testing — nothing in the original build stopped an early tap at all.
+     Snooze and Skip have no such gate; only Taken carries the "did this
+     actually happen" stakes that make an accidental early tap worth
+     catching.
+   - The notification's own lock-screen Taken/Snooze/Skip action buttons
+     (CLAUDE.md §6: "handled without opening the app") are not built yet —
+     `doseActions.ts` exists so that work, whenever it happens, can call
+     into the same functions rather than duplicating the logic a third
+     time.
+   - History tab (CLAUDE.md §6: week view, supply tracking) not built —
+     the mockup's History.dc.html exists as a reference but nothing behind
+     it yet.
 
 ### Verifying a real device's SQLite database from this PC
 

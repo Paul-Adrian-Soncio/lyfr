@@ -1,57 +1,86 @@
-// Schedule creation screen — "Step 2 of 2" after Add Medicine, per the
-// mockup's AddMedication.dc.html footer ("Next: set schedule") and
-// CLAUDE.md §6, which lists scheduling as a distinct feature area from the
-// medication library. No mockup exists for this screen; visual language
-// (cards, pills, stepper pattern) matches the rest of the app regardless.
+// Edit schedule screen. V1 assumes one active regimen per medication — the
+// create flow (app/schedule-medication/[medicationId].tsx) only ever makes
+// one, and CLAUDE.md §6 doesn't describe multiple concurrent regimens per
+// medication. If that assumption ever needs to change (e.g. a taper with
+// different rules over time), this screen's "load the regimen" step is
+// where that would need to become a picker instead.
 //
-// See CLAUDE.md §6 for V1 rule types: fixed daily times, specific weekdays,
-// every N days, with a start date and optional end date.
+// Editing must cancel the OLD regimen's still-pending occurrences before
+// re-syncing under the new rule — otherwise stale occurrences from the old
+// schedule linger at "upcoming" forever alongside the new ones. See
+// AndroidScheduler.cancelRegimen, which marks them "cancelled" rather than
+// leaving them stuck (found while building this screen — see STATE.md).
 
-import { eq } from "drizzle-orm";
-import * as Crypto from "expo-crypto";
+import { and, eq } from "drizzle-orm";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { db } from "@/db/client";
 import { medications, regimens } from "@/db/schema";
-import type { Regimen } from "@/domain/regimen";
+import type { Regimen, RuleConfig } from "@/domain/regimen";
 import { AndroidScheduler } from "@/scheduling/AndroidScheduler";
 import {
-  addDays,
   buildRuleFromState,
   ScheduleFormFields,
   type ScheduleFormState,
-  toDateString,
 } from "@/ui/ScheduleFormFields";
 import { brand, light, radii, typography } from "@/theme/tokens";
 
-export default function ScheduleMedicationScreen() {
+function ruleToFormFields(rule: RuleConfig): Pick<ScheduleFormState, "ruleType" | "times" | "weekdays" | "intervalDays"> {
+  if (rule.type === "fixed_daily") {
+    return { ruleType: "fixed_daily", times: rule.times, weekdays: [1, 3, 5], intervalDays: 2 };
+  }
+  if (rule.type === "specific_weekdays") {
+    return { ruleType: "specific_weekdays", times: rule.times, weekdays: rule.weekdays, intervalDays: 2 };
+  }
+  return { ruleType: "every_n_days", times: rule.times, weekdays: [1, 3, 5], intervalDays: rule.intervalDays };
+}
+
+export default function EditScheduleScreen() {
   const { medicationId } = useLocalSearchParams<{ medicationId: string }>();
   const [medicationName, setMedicationName] = useState<string | null>(null);
-  const [state, setState] = useState<ScheduleFormState>(() => ({
-    ruleType: "fixed_daily",
-    times: ["08:00"],
-    weekdays: [1, 3, 5],
-    intervalDays: 2,
-    startDate: toDateString(new Date()),
-    hasEndDate: false,
-    endDate: addDays(toDateString(new Date()), 7),
-  }));
+  const [regimenId, setRegimenId] = useState<string | null>(null);
+  const [state, setState] = useState<ScheduleFormState | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    db.query.medications.findFirst({ where: eq(medications.id, medicationId) }).then((row) => {
-      if (!row) {
+    async function load() {
+      const medication = await db.query.medications.findFirst({
+        where: eq(medications.id, medicationId),
+      });
+      if (!medication) {
         Alert.alert("Not found", "This medicine no longer exists.");
         router.back();
         return;
       }
-      setMedicationName(row.name);
-    });
+      setMedicationName(medication.name);
+
+      const regimen = await db.query.regimens.findFirst({
+        where: and(eq(regimens.medicationId, medicationId), eq(regimens.active, true)),
+      });
+      if (!regimen) {
+        Alert.alert(
+          "No schedule yet",
+          "This medicine doesn't have a schedule set up. Add one from the medicine's edit screen."
+        );
+        router.back();
+        return;
+      }
+
+      setRegimenId(regimen.id);
+      setState({
+        ...ruleToFormFields(regimen.ruleConfig as RuleConfig),
+        startDate: regimen.startDate,
+        hasEndDate: regimen.endDate != null,
+        endDate: regimen.endDate ?? regimen.startDate,
+      });
+    }
+    load();
   }, [medicationId]);
 
   async function handleSave() {
+    if (!state || !regimenId) return;
     const rule = buildRuleFromState(state);
     if (!rule) {
       Alert.alert("Pick at least one day", "Choose which days this applies to.");
@@ -60,8 +89,15 @@ export default function ScheduleMedicationScreen() {
 
     setSaving(true);
     try {
-      const regimen: Regimen = {
-        id: Crypto.randomUUID(),
+      // Cancel the old regimen's pending occurrences BEFORE changing the
+      // rule — syncRegimen's idempotency is keyed on (regimenId,
+      // scheduledAt), so a changed rule produces new scheduledAt values
+      // that wouldn't collide with (and therefore wouldn't clean up) the
+      // stale ones on their own.
+      await AndroidScheduler.cancelRegimen(regimenId);
+
+      const updatedRegimen: Regimen = {
+        id: regimenId,
         medicationId,
         rule,
         startDate: state.startDate,
@@ -69,27 +105,32 @@ export default function ScheduleMedicationScreen() {
         active: true,
       };
 
-      await db.insert(regimens).values({
-        id: regimen.id,
-        medicationId: regimen.medicationId,
-        ruleType: regimen.rule.type,
-        ruleConfig: regimen.rule,
-        startDate: regimen.startDate,
-        endDate: regimen.endDate,
-        active: regimen.active,
-      });
+      await db
+        .update(regimens)
+        .set({
+          ruleType: updatedRegimen.rule.type,
+          ruleConfig: updatedRegimen.rule,
+          startDate: updatedRegimen.startDate,
+          endDate: updatedRegimen.endDate,
+          updatedAt: Date.now(),
+        })
+        .where(eq(regimens.id, regimenId));
 
-      await AndroidScheduler.syncRegimen(regimen);
+      await AndroidScheduler.syncRegimen(updatedRegimen);
 
       router.dismissTo("/medications");
     } catch (e) {
       Alert.alert(
-        "Couldn't set up reminders",
+        "Couldn't update reminders",
         e instanceof Error ? e.message : "Something went wrong."
       );
     } finally {
       setSaving(false);
     }
+  }
+
+  if (!state) {
+    return <View style={styles.screen} />;
   }
 
   return (
@@ -107,10 +148,7 @@ export default function ScheduleMedicationScreen() {
           </Svg>
         </Pressable>
         <Text allowFontScaling style={styles.headerTitle}>
-          Set schedule
-        </Text>
-        <Text allowFontScaling style={styles.stepLabel}>
-          Step 2 of 2
+          Edit schedule
         </Text>
       </View>
 
@@ -133,7 +171,7 @@ export default function ScheduleMedicationScreen() {
           disabled={saving}
         >
           <Text allowFontScaling style={styles.saveButtonText}>
-            {saving ? "Setting up…" : "Save schedule"}
+            {saving ? "Updating…" : "Save changes"}
           </Text>
         </Pressable>
       </View>
@@ -165,10 +203,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: light.text,
     flexGrow: 1,
-  },
-  stepLabel: {
-    fontSize: typography.absoluteMinSp,
-    color: light.textMuted,
   },
   subtitle: {
     fontSize: typography.bodyMinSp,

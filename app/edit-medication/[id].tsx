@@ -6,7 +6,7 @@
 // baseline") via a native two-step Alert rather than a single tap.
 
 import { eq } from "drizzle-orm";
-import { router, useLocalSearchParams } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
@@ -14,7 +14,7 @@ import { db } from "@/db/client";
 import { medications } from "@/db/schema";
 import { formMeta, type MedicationForm } from "@/domain/medication";
 import { MedicationFormFields, type MedicationFormState } from "@/ui/MedicationFormFields";
-import { brand, light, radii } from "@/theme/tokens";
+import { brand, light, radii, typography } from "@/theme/tokens";
 
 export default function EditMedicationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -127,6 +127,13 @@ export default function EditMedicationScreen() {
       <MedicationFormFields state={state} onChange={setState} />
 
       <View style={styles.footer}>
+        <Link href={{ pathname: "/edit-schedule/[medicationId]", params: { medicationId: id } }} asChild>
+          <Pressable style={styles.editScheduleButton}>
+            <Text allowFontScaling style={styles.editScheduleText}>
+              Edit schedule
+            </Text>
+          </Pressable>
+        </Link>
         <Pressable
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           onPress={handleSave}
@@ -173,8 +180,22 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 20,
+    gap: 10,
     borderTopWidth: 1,
     borderTopColor: brand.frost,
+  },
+  editScheduleButton: {
+    height: 56,
+    borderRadius: radii.buttonLarge,
+    borderWidth: 2,
+    borderColor: brand.fjord,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editScheduleText: {
+    fontSize: typography.bodyMinSp,
+    fontWeight: "700",
+    color: brand.deep,
   },
   saveButton: {
     height: 60,

@@ -24,7 +24,7 @@ import type { Regimen, RuleConfig } from "@/domain/regimen";
 import { logExpectedFire } from "./heartbeat";
 import type { Scheduler } from "./Scheduler";
 
-const REMINDER_CHANNEL_ID = "dose-reminders-v1";
+export const REMINDER_CHANNEL_ID = "dose-reminders-v1";
 
 // How far ahead to keep occurrences scheduled. See CLAUDE.md §3 — this is
 // unrelated to the iOS 64-pending-notification cap (Android has no such
@@ -87,7 +87,10 @@ function toDomainRegimen(row: typeof regimens.$inferSelect): Regimen {
   };
 }
 
-async function scheduleOccurrenceNotification(
+// Exported for reuse by doseActions.ts's snooze — rescheduling a single
+// occurrence outside a full syncRegimen pass needs the same notification
+// shape, and duplicating it risks the two drifting apart.
+export async function scheduleOccurrenceNotification(
   occurrenceId: string,
   medicationName: string,
   scheduledAt: number
@@ -134,7 +137,15 @@ export const AndroidScheduler: Scheduler = {
     const existing = await db.query.doseOccurrences.findMany({
       where: eq(doseOccurrences.regimenId, regimen.id),
     });
-    const existingByTime = new Map(existing.map((row) => [row.scheduledAt, row]));
+    // Only rows still "upcoming" count as already handled. A "cancelled"
+    // row at the same scheduledAt (left behind by a prior edit — see
+    // cancelRegimen) must NOT block a fresh row from being inserted here,
+    // or an edited regimen whose new rule happens to land on the same
+    // clock time as the old one silently generates nothing at all. Found
+    // 2026-09-24 while testing schedule editing — see STATE.md.
+    const existingByTime = new Map(
+      existing.filter((row) => row.status === "upcoming").map((row) => [row.scheduledAt, row])
+    );
 
     for (const occurrence of generated) {
       const existingRow = existingByTime.get(occurrence.scheduledAt);
@@ -173,12 +184,25 @@ export const AndroidScheduler: Scheduler = {
     const rows = await db.query.doseOccurrences.findMany({
       where: eq(doseOccurrences.regimenId, regimenId),
     });
-    const idsToCancel = rows
-      .filter((row) => row.status === "upcoming" && row.actualNotificationId)
+    const upcoming = rows.filter((row) => row.status === "upcoming");
+    const idsToCancel = upcoming
+      .filter((row) => row.actualNotificationId)
       .map((row) => row.actualNotificationId as string);
 
     if (idsToCancel.length > 0) {
       await notifee.cancelTriggerNotifications(idsToCancel);
+    }
+
+    // Mark them cancelled, not left at "upcoming" — otherwise these rows
+    // look like doses still pending forever, and the heartbeat's
+    // reconcile() would eventually flag them as suspected misses once their
+    // time passes, even though nothing was ever supposed to fire. Found
+    // while building schedule editing — see STATE.md.
+    for (const row of upcoming) {
+      await db
+        .update(doseOccurrences)
+        .set({ status: "cancelled" })
+        .where(eq(doseOccurrences.id, row.id));
     }
   },
 
