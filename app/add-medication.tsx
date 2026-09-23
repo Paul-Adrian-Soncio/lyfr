@@ -34,8 +34,9 @@ export default function AddMedicationScreen() {
     }
     setSaving(true);
     try {
+      const id = Crypto.randomUUID();
       await db.insert(medications).values({
-        id: Crypto.randomUUID(),
+        id,
         name: state.name.trim(),
         form: state.form,
         colorTag: state.colorTag,
@@ -43,7 +44,7 @@ export default function AddMedicationScreen() {
         doseAmount: String(state.doseAmount),
         doseUnit: formMeta[state.form].doseUnit,
       });
-      router.back();
+      router.push({ pathname: "/schedule-medication/[medicationId]", params: { medicationId: id } });
     } finally {
       setSaving(false);
     }
@@ -66,6 +67,9 @@ export default function AddMedicationScreen() {
         <Text allowFontScaling style={styles.headerTitle}>
           Add medicine
         </Text>
+        <Text allowFontScaling style={styles.stepLabel}>
+          Step 1 of 2
+        </Text>
       </View>
 
       <MedicationFormFields state={state} onChange={setState} />
@@ -77,7 +81,7 @@ export default function AddMedicationScreen() {
           disabled={saving}
         >
           <Text allowFontScaling style={styles.saveButtonText}>
-            {saving ? "Saving…" : "Save medicine"}
+            {saving ? "Saving…" : "Next: set schedule"}
           </Text>
         </Pressable>
       </View>
@@ -109,6 +113,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: light.text,
     flexGrow: 1,
+  },
+  stepLabel: {
+    fontSize: 16,
+    color: light.textMuted,
   },
   footer: {
     padding: 20,
