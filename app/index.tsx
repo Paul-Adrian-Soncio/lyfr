@@ -11,6 +11,11 @@ export default function TodayScreen() {
       <Text allowFontScaling style={styles.body}>
         Today view goes here.
       </Text>
+      <Link href="/medications">
+        <Text allowFontScaling style={styles.link}>
+          Medicines
+        </Text>
+      </Link>
       <Link href="/add-medication">
         <Text allowFontScaling style={styles.link}>
           Add medicine

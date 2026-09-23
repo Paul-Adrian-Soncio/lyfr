@@ -171,8 +171,24 @@ following this list past the point where it stops making sense.
    querying the live SQLite file — see verification method below), photo
    file present on disk at the stored relative path, correct size for an
    800px-downscaled JPEG (~7KB).
-   - Medication list/library screen (browsing what's been added, edit,
-     archive) not yet built — only the add flow exists so far.
+   - [x] Medication list/library screen — done, `app/medications.tsx`
+     (reactive via Drizzle `useLiveQuery`, filters out archived rows) and
+     `app/edit-medication/[id].tsx` (edit + archive, archive behind a
+     native two-step confirmation per CLAUDE.md §6's "resistant to
+     accidental taps"). Shared form fields extracted to
+     `src/ui/MedicationFormFields.tsx` so add and edit stay in sync.
+     **Real bug found and fixed 2026-09-23:** the list row only rendered
+     the colour tag as the icon tile's background when no photo existed —
+     once a medication had a photo, its colour tag became invisible
+     anywhere in the list. This directly breaks CLAUDE.md §1's "recognition
+     beats reading" principle: form icon, colour tag and photo are meant to
+     be three *redundant* identifiers shown together, not photo-as-fallback
+     for the other two. Fixed by adding a small colour dot next to the name
+     (matching the mockup's History.dc.html Supply section — a 14px dot,
+     independent of icon/photo) so the colour tag is always visible
+     regardless of whether a photo exists. Worth checking the Today view
+     and any future medication display for the same mistake once those are
+     built.
    - No second "set schedule" step yet — CLAUDE.md §6 and the mockup both
      treat scheduling as a distinct step after adding a medication
      ("Step 1 of 2" / "Next: set schedule"). `add-medication.tsx` currently
