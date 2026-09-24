@@ -80,18 +80,20 @@ export default function EditMedicationScreen() {
   // Archiving stops the reminders too — before this it only hid the
   // medicine from the list while its alarms kept firing. Past doses stay
   // untouched so History keeps them (cancelRegimen is future-only).
+  // Flags first, then cancel: a refill that runs in between then skips this
+  // medicine instead of re-booking the doses about to be cancelled.
   async function handleArchiveConfirmed() {
     const active = await db.query.regimens.findMany({
       where: and(eq(regimens.medicationId, id), eq(regimens.active, true)),
     });
+    await db.update(medications).set({ archivedAt: Date.now() }).where(eq(medications.id, id));
     for (const regimen of active) {
-      await AndroidScheduler.cancelRegimen(regimen.id);
       await db
         .update(regimens)
         .set({ active: false, updatedAt: Date.now() })
         .where(eq(regimens.id, regimen.id));
+      await AndroidScheduler.cancelRegimen(regimen.id);
     }
-    await db.update(medications).set({ archivedAt: Date.now() }).where(eq(medications.id, id));
     router.back();
   }
 

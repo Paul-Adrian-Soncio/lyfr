@@ -12,6 +12,7 @@ import { Link } from "expo-router";
 import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import { effectiveStatus } from "@/domain/doseStatus";
 import { formMeta, type MedicationForm } from "@/domain/medication";
 import { resolveMedicationPhotoUri } from "@/domain/medicationPhoto";
 import { markSkipped, markTaken, snooze } from "@/scheduling/doseActions";
@@ -20,7 +21,7 @@ import { brand, light, radii, typography } from "@/theme/tokens";
 import { FormIcon } from "@/ui/FormIcon";
 import { LyfrLogo } from "@/ui/LyfrLogo";
 import { Pressable } from "@/ui/Pressable";
-import { useToday } from "@/ui/useToday";
+import { useNow, useToday } from "@/ui/useToday";
 
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -43,6 +44,14 @@ export default function TodayScreen() {
   const upcoming = occurrences.filter((o) => o.status === "upcoming");
   const next = upcoming[0];
   const later = upcoming.slice(1);
+
+  // A dose past History's missed threshold (2h, doseStatus.ts) stays
+  // actionable here so it can still be logged late, but is labelled
+  // "Pending" rather than "Next". Same rule as History, so the two screens
+  // can't disagree.
+  const now = useNow();
+  const isPending = (o: { status: string; scheduledAt: number }) =>
+    effectiveStatus(o, now) === "missed";
 
   async function runAction(id: string, action: "taken" | "snooze" | "skip") {
     setBusyId(id);
@@ -143,6 +152,7 @@ export default function TodayScreen() {
         {next ? (
           <NextDoseCard
             occurrence={next}
+            pending={isPending(next)}
             busy={busyId === next.id}
             onAction={(action) => handleAction(next, action)}
           />
@@ -171,7 +181,7 @@ export default function TodayScreen() {
               Later today
             </Text>
             {later.map((o) => (
-              <LaterRow key={o.id} occurrence={o} />
+              <LaterRow key={o.id} occurrence={o} pending={isPending(o)} />
             ))}
           </View>
         )}
@@ -210,10 +220,12 @@ export default function TodayScreen() {
 
 function NextDoseCard({
   occurrence,
+  pending,
   busy,
   onAction,
 }: {
   occurrence: ReturnType<typeof mapTodayOccurrences>[number];
+  pending: boolean;
   busy: boolean;
   onAction: (action: "taken" | "snooze" | "skip") => void;
 }) {
@@ -233,7 +245,7 @@ function NextDoseCard({
           />
         </Svg>
         <Text allowFontScaling style={styles.heroTimeText}>
-          Next · {formatTime(occurrence.scheduledAt)}
+          {pending ? "Pending" : "Next"} · {formatTime(occurrence.scheduledAt)}
         </Text>
       </View>
 
@@ -304,7 +316,13 @@ function NextDoseCard({
   );
 }
 
-function LaterRow({ occurrence }: { occurrence: ReturnType<typeof mapTodayOccurrences>[number] }) {
+function LaterRow({
+  occurrence,
+  pending,
+}: {
+  occurrence: ReturnType<typeof mapTodayOccurrences>[number];
+  pending: boolean;
+}) {
   const form = occurrence.form as MedicationForm;
   const meta = formMeta[form];
 
@@ -332,7 +350,9 @@ function LaterRow({ occurrence }: { occurrence: ReturnType<typeof mapTodayOccurr
           />
         </Svg>
         <Text allowFontScaling style={styles.laterTimeText}>
-          {formatTime(occurrence.scheduledAt)}
+          {pending
+            ? `Pending · ${formatTime(occurrence.scheduledAt)}`
+            : formatTime(occurrence.scheduledAt)}
         </Text>
       </View>
     </View>

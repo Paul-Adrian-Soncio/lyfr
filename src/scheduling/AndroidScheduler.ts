@@ -84,6 +84,12 @@ function currentWindow(): { windowStart: string; windowEnd: string } {
   return { windowStart: toLocalDateString(now), windowEnd: toLocalDateString(end) };
 }
 
+/** Epoch ms of the midnight that ends the given YYYY-MM-DD local date. */
+function endOfLocalDate(dateString: string): number {
+  const [y, m, d] = dateString.split("-").map(Number);
+  return new Date(y, m - 1, d + 1).getTime();
+}
+
 function toDomainRegimen(row: typeof regimens.$inferSelect): Regimen {
   return {
     id: row.id,
@@ -93,6 +99,19 @@ function toDomainRegimen(row: typeof regimens.$inferSelect): Regimen {
     endDate: row.endDate,
     active: row.active,
   };
+}
+
+export const SNOOZE_MS = 10 * 60_000;
+
+/**
+ * When a pending dose's reminder should next go off: its scheduled time,
+ * or 10 minutes after it was last snoozed. Snooze works from whichever is
+ * later of the press and the scheduled time, so a dose snoozed before it
+ * was due is delayed rather than pulled forward.
+ */
+export function nextFireAt(row: { scheduledAt: number; lastSnoozedAt: number | null }): number {
+  if (row.lastSnoozedAt == null) return row.scheduledAt;
+  return Math.max(row.lastSnoozedAt, row.scheduledAt) + SNOOZE_MS;
 }
 
 // Action ids, matched in notificationEvents.ts. CLAUDE.md §6: Taken, Snooze
@@ -138,40 +157,94 @@ export async function scheduleOccurrenceNotification(
   );
 }
 
-// Materialises and schedules the regimen's occurrences for the current
-// window. Callers are responsible for permission and channel setup.
+// Every operation that books or cancels doses runs through this queue, one
+// at a time. Each reads existing rows, then writes over several awaits; two
+// interleaved runs both see a slot as empty and book it twice. Found
+// 2026-09-25: a refill (started by returning to the app) overlapped a
+// schedule save and double-booked every day after the first.
+let queue: Promise<unknown> = Promise.resolve();
+function exclusive<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(task, task);
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+type OccurrenceRow = typeof doseOccurrences.$inferSelect;
+
+// Cancelled, not deleted or left at "upcoming" — an upcoming row looks
+// pending forever, and the heartbeat's reconcile() would later flag it as a
+// suspected miss though nothing was ever meant to fire.
+async function cancelRows(rows: OccurrenceRow[]): Promise<void> {
+  for (const row of rows) {
+    await notifee.cancelNotification(row.actualNotificationId ?? row.id);
+    await db
+      .update(doseOccurrences)
+      .set({ status: "cancelled" })
+      .where(eq(doseOccurrences.id, row.id));
+  }
+}
+
+// Future doses only. A dose already past its time is part of the record —
+// untouched, it reads as missed in History — and cancelling it would erase
+// that miss whenever the schedule was edited or the medicine archived.
+async function cancelFuture(regimenId: string): Promise<void> {
+  const now = Date.now();
+  const rows = await db.query.doseOccurrences.findMany({
+    where: eq(doseOccurrences.regimenId, regimenId),
+  });
+  await cancelRows(rows.filter((row) => row.status === "upcoming" && row.scheduledAt > now));
+}
+
+/**
+ * Brings the regimen's future doses in the window to exactly what its rule
+ * says: books missing slots, cancels upcoming doses the rule no longer
+ * produces (a schedule edit), and cancels extra rows at the same time (a
+ * past double-booking). Callers handle permission and channel setup, and
+ * must be running inside `exclusive`.
+ */
 async function syncOccurrences(regimen: Regimen, medicationName: string): Promise<void> {
   const { windowStart, windowEnd } = currentWindow();
-  const generated = generateOccurrences(regimen, windowStart, windowEnd);
   const now = Date.now();
+  const windowEndMs = endOfLocalDate(windowEnd);
+  // The window starts at midnight today, so it includes times already gone.
+  // Never book those: a schedule saved at noon shouldn't invent a missed 8am
+  // dose, and the OS can't fire a reminder in the past.
+  const wanted = new Set(
+    generateOccurrences(regimen, windowStart, windowEnd)
+      .map((o) => o.scheduledAt)
+      .filter((t) => t > now),
+  );
 
   const existing = await db.query.doseOccurrences.findMany({
     where: eq(doseOccurrences.regimenId, regimen.id),
   });
-  // Any live row at a time means that slot is handled — upcoming, taken,
-  // skipped or missed alike. Only "cancelled" rows (left by an edit, see
-  // cancelRegimen) are ignored, so an edited rule landing on the same clock
-  // time as the old one still gets a fresh row. An earlier version counted
-  // only "upcoming" rows, which re-booked any dose already taken today on
-  // every refill. Both found 2026-09-24/25 — see STATE.md.
-  const handledTimes = new Set(
-    existing.filter((row) => row.status !== "cancelled").map((row) => row.scheduledAt),
-  );
 
-  for (const occurrence of generated) {
-    // The window starts at midnight today, so it includes times already
-    // gone. Never book those: a schedule saved at noon shouldn't invent a
-    // missed 8am dose, and the OS can't fire a reminder in the past.
-    if (occurrence.scheduledAt <= now || handledTimes.has(occurrence.scheduledAt)) {
+  // Any live row at a time means that slot is handled — upcoming, taken,
+  // skipped or missed alike. Cancelled rows don't count, so an edited rule
+  // landing on the same clock time as the old one still gets a fresh row.
+  const handledTimes = new Set<number>();
+  const toCancel: OccurrenceRow[] = [];
+  for (const row of existing) {
+    if (row.status === "cancelled") continue;
+    const futurePending =
+      row.status === "upcoming" && row.scheduledAt > now && row.scheduledAt < windowEndMs;
+    if (futurePending && (!wanted.has(row.scheduledAt) || handledTimes.has(row.scheduledAt))) {
+      toCancel.push(row);
       continue;
     }
+    handledTimes.add(row.scheduledAt);
+  }
+  await cancelRows(toCancel);
+
+  for (const scheduledAt of wanted) {
+    if (handledTimes.has(scheduledAt)) continue;
 
     const [inserted] = await db
       .insert(doseOccurrences)
       .values({
         id: Crypto.randomUUID(),
         regimenId: regimen.id,
-        scheduledAt: occurrence.scheduledAt,
+        scheduledAt,
         status: "upcoming",
       })
       .returning();
@@ -187,57 +260,63 @@ async function syncOccurrences(regimen: Regimen, medicationName: string): Promis
   }
 }
 
+/**
+ * Re-creates the OS alarm behind every pending reminder. Force-stopping an
+ * app — Android's "Force stop" button, `adb shell am force-stop`, some OEM
+ * battery tools — deletes all its alarms, and neither Notifee nor the
+ * database notices: rows stay "upcoming", Notifee still lists the triggers,
+ * and nothing ever fires. Found 2026-09-25: 26 live future doses, zero
+ * pending alarms. Re-creating a trigger with the same id replaces it, so
+ * this is safe to repeat. Run on every launch — a force-stopped app runs no
+ * code until it is next opened, so launch is the earliest point to repair.
+ * Android-only: iOS never drops pending notifications this way.
+ */
+export function rearmPendingAlarms(): Promise<void> {
+  return exclusive(async () => {
+    if (!(await hasPermission())) return;
+    await ensureChannel();
+    const now = Date.now();
+    const pending = await db.query.doseOccurrences.findMany({
+      where: eq(doseOccurrences.status, "upcoming"),
+      with: { regimen: { with: { medication: true } } },
+    });
+    for (const row of pending) {
+      const fireAt = nextFireAt(row);
+      if (fireAt <= now) continue;
+      if (!row.regimen.active || row.regimen.medication.archivedAt != null) continue;
+      await scheduleOccurrenceNotification(row.id, row.regimen.medication.name, fireAt);
+    }
+  });
+}
+
 let refillInFlight: Promise<void> | null = null;
 
 export const AndroidScheduler: Scheduler = {
+  /**
+   * Makes the regimen's future doses match its current rule. Safe to call
+   * repeatedly, and after an edit — it cancels doses the old rule booked.
+   */
   async syncRegimen(regimen: Regimen): Promise<void> {
     await ensurePermission();
     await ensureChannel();
 
-    const medication = await db.query.medications.findFirst({
-      where: eq(medications.id, regimen.medicationId),
+    await exclusive(async () => {
+      const medication = await db.query.medications.findFirst({
+        where: eq(medications.id, regimen.medicationId),
+      });
+      if (!medication) {
+        throw new Error(`syncRegimen: no medication found for id ${regimen.medicationId}`);
+      }
+      if (!regimen.active) {
+        await cancelFuture(regimen.id);
+        return;
+      }
+      await syncOccurrences(regimen, medication.name);
     });
-    if (!medication) {
-      throw new Error(`syncRegimen: no medication found for id ${regimen.medicationId}`);
-    }
-
-    if (!regimen.active) {
-      await this.cancelRegimen(regimen.id);
-      return;
-    }
-
-    await syncOccurrences(regimen, medication.name);
   },
 
   async cancelRegimen(regimenId: string): Promise<void> {
-    const rows = await db.query.doseOccurrences.findMany({
-      where: eq(doseOccurrences.regimenId, regimenId),
-    });
-    // Future doses only. A dose already past its time is part of the
-    // record — untouched, it reads as missed in History — and cancelling
-    // it here would erase that miss whenever the schedule was edited or
-    // the medicine archived. Found 2026-09-25 while wiring refills.
-    const now = Date.now();
-    const upcoming = rows.filter((row) => row.status === "upcoming" && row.scheduledAt > now);
-    const idsToCancel = upcoming
-      .filter((row) => row.actualNotificationId)
-      .map((row) => row.actualNotificationId as string);
-
-    if (idsToCancel.length > 0) {
-      await notifee.cancelTriggerNotifications(idsToCancel);
-    }
-
-    // Mark them cancelled, not left at "upcoming" — otherwise these rows
-    // look like doses still pending forever, and the heartbeat's
-    // reconcile() would eventually flag them as suspected misses once their
-    // time passes, even though nothing was ever supposed to fire. Found
-    // while building schedule editing — see STATE.md.
-    for (const row of upcoming) {
-      await db
-        .update(doseOccurrences)
-        .set({ status: "cancelled" })
-        .where(eq(doseOccurrences.id, row.id));
-    }
+    await exclusive(() => cancelFuture(regimenId));
   },
 
   // Tops the rolling window back up to WINDOW_DAYS ahead. Without this,
@@ -248,9 +327,11 @@ export const AndroidScheduler: Scheduler = {
     // Launch and foreground can fire close together. Two overlapping runs
     // would both see a slot as empty and book it twice.
     if (refillInFlight) return refillInFlight;
-    refillInFlight = (async () => {
+    refillInFlight = exclusive(async () => {
       if (!(await hasPermission())) return;
       await ensureChannel();
+      // Read inside the queue, so a refill sees any schedule edit saved
+      // before it ran rather than re-booking the old rule.
       const activeRegimens = await db.query.regimens.findMany({
         where: eq(regimens.active, true),
         with: { medication: true },
@@ -259,7 +340,7 @@ export const AndroidScheduler: Scheduler = {
         if (row.medication.archivedAt != null) continue;
         await syncOccurrences(toDomainRegimen(row), row.medication.name);
       }
-    })().finally(() => {
+    }).finally(() => {
       refillInFlight = null;
     });
     return refillInFlight;

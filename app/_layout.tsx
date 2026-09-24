@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { AppState, Text, View } from "react-native";
 import { db } from "@/db/client";
 import migrations from "@/db/migrations/migrations";
-import { AndroidScheduler } from "@/scheduling/AndroidScheduler";
+import { AndroidScheduler, rearmPendingAlarms } from "@/scheduling/AndroidScheduler";
 import { registerBackgroundHeartbeat } from "@/scheduling/backgroundHeartbeat";
 import { reconcile } from "@/scheduling/heartbeat";
 import { registerForegroundEventHandler } from "@/scheduling/notificationEvents";
@@ -28,6 +28,9 @@ export default function RootLayout() {
       reconcile().then((result) => setSuspectedMissCount(result.suspectedMisses.length));
     }
 
+    // Launch only: a force-stop wipes the app's OS alarms and nothing else
+    // restores them. Queued ahead of the first refill.
+    rearmPendingAlarms().catch((e) => console.warn("rearmPendingAlarms failed", e));
     checkIn();
     registerBackgroundHeartbeat();
     const unsubscribeEvents = registerForegroundEventHandler();

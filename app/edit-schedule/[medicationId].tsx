@@ -5,11 +5,10 @@
 // different rules over time), this screen's "load the regimen" step is
 // where that would need to become a picker instead.
 //
-// Editing must cancel the OLD regimen's still-pending occurrences before
-// re-syncing under the new rule — otherwise stale occurrences from the old
-// schedule linger at "upcoming" forever alongside the new ones. See
-// AndroidScheduler.cancelRegimen, which marks them "cancelled" rather than
-// leaving them stuck (found while building this screen — see STATE.md).
+// Saving writes the new rule first, then syncs. syncRegimen reconciles:
+// it books the new rule's doses and cancels future ones the old rule
+// booked, so no separate cancel step is needed — and a separate one left a
+// gap where a refill could re-book the old times (see STATE.md).
 
 import { and, eq } from "drizzle-orm";
 import { router, useLocalSearchParams } from "expo-router";
@@ -102,13 +101,6 @@ export default function EditScheduleScreen() {
 
     setSaving(true);
     try {
-      // Cancel the old regimen's pending occurrences BEFORE changing the
-      // rule — syncRegimen's idempotency is keyed on (regimenId,
-      // scheduledAt), so a changed rule produces new scheduledAt values
-      // that wouldn't collide with (and therefore wouldn't clean up) the
-      // stale ones on their own.
-      await AndroidScheduler.cancelRegimen(regimenId);
-
       const updatedRegimen: Regimen = {
         id: regimenId,
         medicationId,

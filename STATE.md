@@ -8,8 +8,8 @@ Everything in both files is subject to change. The ordering below is a plan, not
 a commitment. If the work suggests a better sequence, say so rather than
 following this list past the point where it stops making sense.
 
-**Last updated:** 2026-09-23
-**Phase:** Scheduling + reliability layer proven end-to-end; medication library UI underway
+**Last updated:** 2026-09-25
+**Phase:** Core V1 loop working on-device (add → schedule → remind → act → history). Remaining V1: supply tracking, notification polish, onboarding, tab bar, backup, Sentry.
 
 ---
 
@@ -259,9 +259,120 @@ following this list past the point where it stops making sense.
      `doseActions.ts` exists so that work, whenever it happens, can call
      into the same functions rather than duplicating the logic a third
      time.
-   - History tab (CLAUDE.md §6: week view, supply tracking) not built —
-     the mockup's History.dc.html exists as a reference but nothing behind
-     it yet.
+   - [x] History tab (week view + corrections) — done 2026-09-24/25,
+     `app/history.tsx`. Rolling 7-day strip ending today, per-day dose
+     list, "Correct this dose" on past doses. Supply tracking (the lower
+     half of the mockup's History.dc.html, and CLAUDE.md §6's "estimated
+     supply remaining, manually correctable, low-supply warning") is
+     **not built** — deliberately split out as the next piece.
+     - **"Missed" is derived, not stored** (`src/domain/doseStatus.ts`,
+       Vitest-tested): an untouched dose counts as missed 2 hours after its
+       scheduled time. The 2h grace period was the developer's choice —
+       CLAUDE.md doesn't specify one. Nothing writes "missed" to the DB
+       unless someone corrects a dose to it.
+     - **Corrections** (`correctDose` in `src/scheduling/doseActions.ts`)
+       update the dose and append the old status to `dose_edits` in one
+       transaction (expo-sqlite transactions are synchronous: `.run()`,
+       not `await`). The audit row records the status the person *saw* —
+       an untouched overdue dose is stored `upcoming` but recorded as
+       corrected from `missed`.
+     - **Timestamps** (`src/domain/doseActivity.ts`, Vitest-tested): each
+       dose shows "Snoozed at…" and "Taken/Skipped at…", or "Changed from X
+       to Y at…" if corrected. A corrected dose never shows "Taken at" —
+       its `acknowledgedAt` is the correction time, not when it was taken.
+       Snoozes are recorded via new `snooze_count` / `last_snoozed_at`
+       columns (migration `0001_slippery_talisman.sql`, additive; verified
+       on-device that all existing rows survived).
+     - Doses from archived medications stay in History (only the
+       medicines list filters them out).
+     - **Decided 2026-09-25 (developer):** a dose overdue by more than 2h
+       stays on Today and stays actionable (it can still be logged late),
+       but is labelled "Pending" instead of "Next" — on the hero card and
+       on its time pill in "Later today". Uses `effectiveStatus` from
+       `doseStatus.ts`, the same rule as History. Today re-renders every
+       minute and on return to foreground (`useNow` in
+       `src/ui/useToday.ts`) so the label flips without new data.
+   - **Day rollover bug, fixed 2026-09-25.** Today and History captured
+     "today" on mount; Drizzle's `useLiveQuery` only re-runs on table
+     changes or its `deps`, and Today passed none. Android keeps the app
+     alive in the background, so opening at 10pm and resuming at 7am would
+     show yesterday. Fixed with `src/ui/useToday.ts` (changes at midnight
+     via timer and on return to foreground via AppState); both screens take
+     their day from it. Not yet verified with a real overnight
+     background-resume.
+9. [x] Reminders keep themselves topped up — done 2026-09-25. Before this,
+   `refillWindow()` existed but **nothing called it**: each regimen only
+   ever had the 7 days booked when it was saved, so reminders would have
+   silently stopped a week after setup. Now called on launch, on every
+   return to foreground (`app/_layout.tsx`), and from the background
+   heartbeat task. It never prompts for permission (checks
+   `getNotificationSettings` instead — it runs headless), skips archived
+   medications, and can't overlap itself. Verified no duplicate slots
+   after a launch refill. Not yet seen it *extend* a window on-device —
+   both test regimens had every slot already booked.
+   Bugs found while wiring it, all fixed:
+   - `syncOccurrences` counted only `upcoming` rows as already handled
+     (the edit-schedule fix from 2026-09-24 went too far), so every refill
+     would re-book any dose already **taken** today. Now any non-cancelled
+     row counts, and slots in the past are never booked.
+   - `cancelRegimen` cancelled overdue doses too, so editing a schedule or
+     archiving erased that day's misses from History. Now future-only.
+   - **Archiving didn't stop reminders** — it only hid the medicine. Now
+     deactivates its regimens and cancels future reminders.
+   - Marking Taken/Skipped from Today didn't cancel the reminder, so a
+     dose marked taken early still rang later. Now cancels it.
+   - Snooze moved `scheduledAt`, which left the original slot looking
+     empty to refills (double-booking) and pulled a not-yet-due dose
+     *earlier*. Now snooze keeps `scheduledAt` and only re-fires the
+     notification at max(now, scheduledAt) + 10 min.
+   Two more found 2026-09-25 by checking the tablet's DB and alarms
+   directly — neither was visible in the UI:
+   - **Double-booking race.** Three schedules had two live rows (and two
+     alarms) per future slot. A refill, started by returning to the app,
+     overlapped a schedule save: both read the table, both saw days as
+     empty, both booked them. (Test5's first day was booked once, every
+     day after twice — the refill read the table after the save had
+     written only day one.) Fixed: everything that books or cancels doses
+     runs through one queue (`exclusive` in `AndroidScheduler.ts`), and
+     `syncOccurrences` now *reconciles* — books missing slots, cancels
+     future doses the rule no longer produces and extra rows at the same
+     time. That also repaired the existing duplicates on the next refill,
+     and let edit-schedule drop its separate cancel step (which left a gap
+     where a refill could re-book the old times). Archive now sets its
+     flags before cancelling, for the same reason.
+   - **Force-stop deletes every alarm, silently.** 26 live future doses in
+     the DB, zero alarms pending in Android (`dumpsys alarm`, "Pending
+     alarms per uid", Lyfr is `u0a221`). Force-stopping an app removes all
+     its alarms; Notifee still lists the triggers and the rows stay
+     "upcoming", so nothing looks wrong and nothing fires. Caused here by
+     restarting the app with `am force-stop` during testing — but Android's
+     own "Force stop" button and some battery tools do the same. Fixed:
+     `rearmPendingAlarms()` re-creates the alarm behind every pending dose
+     on launch (snoozed doses at their snoozed time). Verified: 0 pending
+     after a deliberate force-stop, 26 after relaunch, matching the 26 live
+     doses. A force-stopped app can't run until reopened, so between the
+     force-stop and the next launch there are still no reminders.
+10. [x] Taken / Snooze / Skip buttons on the notification — done
+    2026-09-25. Actions have no `launchActivity`, so they run in the
+    background handler without opening the app; `notificationEvents.ts`
+    routes them to the same `doseActions.ts` functions Today uses. Also
+    fixed: tapping the notification body did nothing (`pressAction`
+    needed `launchActivity: "default"`). Snooze confirmed working on the
+    tablet; see "To verify" for the lock-screen question. Reminders
+    booked before this change have no buttons until their schedule is
+    edited or they're rebooked.
+11. Button press feedback — done 2026-09-25. `src/ui/Pressable.tsx` wraps
+    React Native's Pressable to dim (0.7) and shrink (0.97) while held; all
+    screens import it instead of react-native's. New tappables should too.
+    Haptics (`expo-haptics`, native rebuild) offered but not done.
+12. Biome — first run 2026-09-25, now clean. See the gotcha below.
+
+**Next up, in order:** supply tracking → the rest of the reminder spec
+(photo on the notification, grouping doses that share a time, re-notify
+if unacknowledged) → onboarding (permission + battery walkthrough on first
+run; right now a denied permission fails `syncRegimen` with no UI
+explaining why) → bottom tab bar (mockup has Today / Medicines / History;
+navigation is still a link row) → backup export → Sentry.
 
 ### Verifying a real device's SQLite database from this PC
 
@@ -354,7 +465,12 @@ Each of these is a documented behaviour that varies in practice. Confirm on the
 real device and record the result here.
 
 - [ ] Notifee reschedules trigger notifications after reboot. Actually reboot the
-      tablet and confirm alarms return.
+      tablet and confirm alarms return. **Higher priority since
+      2026-09-25:** force-stop was found to wipe every alarm with no visible
+      sign (see item 9). Check with `adb shell dumpsys alarm | grep "Pending
+      alarms per uid"` — Lyfr's count (`u0a221`) should equal its live
+      future doses both before and after a reboot, *without* opening the
+      app. If it drops to 0, relying on launch-time re-arm is not enough.
 - [x] Exact alarms fire through Doze on the unplugged tablet with the screen off,
       *and* the resulting notification is actually noticeable on a locked
       screen. Confirmed 2026-09-17 via a throwaway spike screen
@@ -382,8 +498,24 @@ real device and record the result here.
         reserving it for the system Clock app. CLAUDE.md §6 does not require
         screen-wake, only sound + high importance, so this was not pursued
         further. Do not re-attempt this without a specific reason.
-- [ ] Notification actions (Taken, Snooze, Skip) work from the lock screen
-      without unlocking.
+- [~] Notification actions (Taken, Snooze, Skip) work from the lock screen
+      without unlocking. **Tested 2026-09-25 on the tablet:** pressing
+      Snooze on the lock screen made Samsung ask for the password; after
+      unlocking, Lyfr was on screen; the reminder re-fired 10 minutes later
+      with nothing pressed in the app — so the action itself ran.
+      Checked Notifee core (`app.notifee.core`, via `javap`): action
+      buttons are `PendingIntent.getService(ReceiverService)` — a
+      background service, not an activity — so the button should not open
+      the app by itself; only the notification body uses the activity
+      trampoline (`getActivities`). Leading explanation: Lyfr was already
+      in the foreground when the tablet was locked, and unlocking returned
+      to it. The unlock prompt is One UI policy — stock Android runs
+      service-backed actions from the lock screen without unlocking.
+      **Still to check:** (1) lock from the home screen, press Snooze —
+      does it land on home, not Lyfr? (2) Settings → Lock screen →
+      Notifications: does showing content change the unlock prompt?
+      (3) Repeat both on the mother's phone. If unlock is always required,
+      the action still works — it's one extra step, not a failure.
 - [ ] The app survives several days unopened without Samsung's unused-app sleep
       killing its alarms.
 - [ ] Battery Saver mode does not suppress alarms once whitelisted.
@@ -409,6 +541,9 @@ Reversals go here with a reason, so the history is visible.
 | — | Name: Lyfr | Old Norse *lyf*, medicine. Short, fits an icon label, avoids the Lyft collision better than bare "Lyf" |
 | — | Nordic blue palette | Steady and reliable over clinical; see `CLAUDE.md` §7 |
 | 2026-09-23 | Added "Vitamin" as a 9th medication form, alongside the 8 in `CLAUDE.md` §5's table | Target users (§1) are likely taking supplements alongside prescriptions; a distinct form lets the medicine list visually separate them. Behaves like tablet/capsule (count-based dosing) — see `src/domain/medication.ts`. |
+| 2026-09-24 | "Missed" derived at read time with a 2-hour grace period, not stored | CLAUDE.md §3: what was missed is a pure function over stored occurrences. 2h chosen by the developer — late enough not to flag a slightly late dose, soon enough that History is right the same day. |
+| 2026-09-24 | Custom stepper time picker instead of the native OS picker | Design freedom, and discrete taps suit reduced dexterity better than a drag wheel. Held to the native picker's usability bar; revisit if it causes problems. |
+| 2026-09-25 | Snooze re-fires the notification without changing `scheduledAt` | `scheduledAt` is the dose's identity for refills and History. Moving it caused double-booking and pulled not-yet-due doses earlier. |
 
 ---
 
@@ -579,3 +714,37 @@ project's dev environment needed beyond a stock Expo/Android Studio install:
   `PATH`.
 - Both are **user-level environment variables** — take effect in new terminal
   sessions only, not ones already open.
+
+### Gotcha: Biome (first run 2026-09-25)
+
+Run `npm run lint` before every stopping point. Three traps found on the
+first run:
+
+- **`biome migrate` silently disabled linting.** It rewrote the deprecated
+  `"rules": { "recommended": true }` as `"preset": "none"` and reported
+  success. With `none`, lint findings dropped to zero. The correct value is
+  `"preset": "recommended"`. Check `biome.json` after any migrate.
+- **Don't apply its unsafe fixes blindly.** Its suggested fix for
+  `src/ui/useToday.ts` was to drop `[key]` from the effect's deps, which
+  would make the midnight rollover work once and never again (the timer
+  is never re-armed). Kept, with a `biome-ignore` explaining why.
+- **Line endings.** This machine has `core.autocrlf=true`, so checkouts
+  convert to CRLF while Biome formats to LF — every file would fail
+  `biome check` after the next branch switch. `.gitattributes` now forces
+  `eol=lf` in the working copy.
+
+`src/db/migrations/` is excluded in `biome.json`: drizzle-kit generates it,
+so formatting it by hand only creates churn in future migration diffs.
+
+### Gotcha: don't restart the app with force-stop when testing reminders
+
+`adb shell am force-stop ph.pauladrian.lyfr` deletes every alarm the app
+has set. The app re-arms them on its next launch (`rearmPendingAlarms`), but
+any test relying on reminders that were armed before the force-stop is
+testing something else. Use it only when force-stop is what's being tested.
+To check alarms are actually armed rather than trusting the DB or Notifee,
+compare Lyfr's entry in `adb shell dumpsys alarm | grep "Pending alarms per
+uid"` (uid from `adb shell cmd package list packages -U ph.pauladrian.lyfr`,
+currently 10221 → `u0a221`) against the live future doses. Don't count
+matches for the package name across the whole dump: most of them are in the
+added/delivered/removed history sections, not pending.

@@ -16,7 +16,7 @@ import * as Crypto from "expo-crypto";
 import { db } from "@/db/client";
 import { doseEdits, doseOccurrences } from "@/db/schema";
 import type { EffectiveStatus } from "@/domain/doseStatus";
-import { scheduleOccurrenceNotification } from "./AndroidScheduler";
+import { nextFireAt, scheduleOccurrenceNotification } from "./AndroidScheduler";
 
 // Both also cancel the dose's reminder — the notification id is the
 // occurrence id. Otherwise a dose marked taken early still fires later
@@ -41,8 +41,6 @@ export async function markSkipped(occurrenceId: string): Promise<void> {
 // scheduled time is the dose's identity: refills match slots by it, and
 // History shows it. Moving it left the original slot looking empty, so a
 // refill would book the dose twice (found 2026-09-25).
-const SNOOZE_MINUTES = 10;
-
 export async function snooze(occurrenceId: string): Promise<void> {
   const row = await db.query.doseOccurrences.findFirst({
     where: eq(doseOccurrences.id, occurrenceId),
@@ -50,10 +48,10 @@ export async function snooze(occurrenceId: string): Promise<void> {
   });
   if (!row) return;
 
-  // From whichever is later, so snoozing a dose that isn't due yet delays
-  // it rather than pulling it forward.
+  // Same calculation rearmPendingAlarms uses, so a snoozed dose re-armed
+  // after a force-stop still fires at its snoozed time.
   const now = Date.now();
-  const refireAt = Math.max(now, row.scheduledAt) + SNOOZE_MINUTES * 60_000;
+  const refireAt = nextFireAt({ scheduledAt: row.scheduledAt, lastSnoozedAt: now });
 
   await db
     .update(doseOccurrences)

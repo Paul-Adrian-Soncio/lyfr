@@ -40,3 +40,26 @@ export function useToday(): Date {
 
   return useMemo(() => new Date(key), [key]);
 }
+
+/**
+ * The current time, refreshed every minute and on return to foreground.
+ * For labels that depend on how late a dose is — a screen only otherwise
+ * re-renders when its data changes, so a dose crossing the missed
+ * threshold while the app sat open would keep its old label.
+ */
+export function useNow(intervalMs = 60_000): number {
+  const [now, setNow] = useState(Date.now);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") setNow(Date.now());
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [intervalMs]);
+
+  return now;
+}
