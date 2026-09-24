@@ -33,6 +33,22 @@ export const medicationTags = [
   "#3F4A45", // slate
 ] as const;
 
+function relativeLuminance(hex: string): number {
+  const channel = (i: number) => {
+    const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
+
+/** Woad or white, whichever contrasts more with a medication tag colour. */
+export function iconColorOn(background: string): string {
+  const bg = relativeLuminance(background);
+  const onWhite = 1.05 / (bg + 0.05);
+  const onWoad = (bg + 0.05) / (relativeLuminance("#0D2839") + 0.05);
+  return onWoad > onWhite ? "#0D2839" : "#FFFFFF";
+}
+
 export const dark = {
   background: "#0B1620",
   surface: "#14212C",

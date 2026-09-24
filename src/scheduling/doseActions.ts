@@ -5,15 +5,17 @@
 // which the notification action handler should eventually call into too,
 // so the two paths don't diverge).
 //
-// This only covers the FIRST action taken on an occurrence. Correcting an
-// already-set status afterward is a dose_edits concern — see CLAUDE.md §5,
-// "dose_edits is an audit trail" — and belongs to the History screen, not
-// built yet.
+// markTaken/markSkipped/snooze are the FIRST action on an occurrence.
+// Changing a status after the fact goes through correctDose, which keeps
+// the previous value in dose_edits — CLAUDE.md "Always true": edits are
+// appended, never destructive.
 
 import notifee from "@notifee/react-native";
 import { eq } from "drizzle-orm";
+import * as Crypto from "expo-crypto";
 import { db } from "@/db/client";
-import { doseOccurrences } from "@/db/schema";
+import { doseEdits, doseOccurrences } from "@/db/schema";
+import type { EffectiveStatus } from "@/domain/doseStatus";
 import { scheduleOccurrenceNotification } from "./AndroidScheduler";
 
 export async function markTaken(occurrenceId: string): Promise<void> {
@@ -53,4 +55,29 @@ export async function snooze(occurrenceId: string): Promise<void> {
     await notifee.cancelTriggerNotification(row.actualNotificationId);
   }
   await scheduleOccurrenceNotification(row.id, row.regimen.medication.name, newTime);
+}
+
+/**
+ * Corrects a past dose's status. `previous` is the status the person saw
+ * (the effective one), not the raw stored value — an untouched dose past
+ * its grace period is stored as "upcoming" but was shown and corrected as
+ * "missed", and the audit trail should say so.
+ */
+export function correctDose(occurrenceId: string, previous: EffectiveStatus, next: EffectiveStatus): void {
+  const now = Date.now();
+  db.transaction((tx) => {
+    tx.insert(doseEdits)
+      .values({
+        id: Crypto.randomUUID(),
+        occurrenceId,
+        previousStatus: previous,
+        newStatus: next,
+        editedAt: now,
+      })
+      .run();
+    tx.update(doseOccurrences)
+      .set({ status: next, acknowledgedAt: next === "missed" ? null : now })
+      .where(eq(doseOccurrences.id, occurrenceId))
+      .run();
+  });
 }

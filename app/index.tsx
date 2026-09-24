@@ -18,6 +18,7 @@ import { markSkipped, markTaken, snooze } from "@/scheduling/doseActions";
 import { mapTodayOccurrences, todayOccurrencesQuery } from "@/scheduling/todayOccurrences";
 import { FormIcon } from "@/ui/FormIcon";
 import { LyfrLogo } from "@/ui/LyfrLogo";
+import { useToday } from "@/ui/useToday";
 import { brand, light, radii, typography } from "@/theme/tokens";
 
 function formatTime(ms: number): string {
@@ -29,7 +30,8 @@ function formatDate(date: Date): string {
 }
 
 export default function TodayScreen() {
-  const { data } = useLiveQuery(todayOccurrencesQuery());
+  const today = useToday();
+  const { data } = useLiveQuery(todayOccurrencesQuery(today), [today.getTime()]);
   const occurrences = mapTodayOccurrences(data ?? []);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -94,7 +96,7 @@ export default function TodayScreen() {
               Today
             </Text>
             <Text allowFontScaling style={styles.dateText}>
-              {formatDate(new Date())}
+              {formatDate(today)}
             </Text>
           </View>
 
@@ -166,6 +168,11 @@ export default function TodayScreen() {
         <Link href="/medications">
           <Text allowFontScaling style={styles.devLink}>
             Medicines
+          </Text>
+        </Link>
+        <Link href="/history">
+          <Text allowFontScaling style={styles.devLink}>
+            History
           </Text>
         </Link>
         <Link href="/doze-spike">
