@@ -12,10 +12,10 @@
 // turns out not to hold up in practice — see STATE.md.
 
 import { StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import type { LocalTime } from "@/domain/regimen";
 import { brand, light, radii } from "@/theme/tokens";
+import { Pressable } from "@/ui/Pressable";
 
 interface TimeStepperProps {
   value: LocalTime;
@@ -64,7 +64,12 @@ export function TimeStepper({ value, onChange }: TimeStepperProps) {
 
   return (
     <View style={styles.row}>
-      <NumberStepper label="Hour" value={hour12} onDecrement={() => stepHour(-1)} onIncrement={() => stepHour(1)} />
+      <NumberStepper
+        label="Hour"
+        value={hour12}
+        onDecrement={() => stepHour(-1)}
+        onIncrement={() => stepHour(1)}
+      />
       <Text allowFontScaling style={styles.colon}>
         :
       </Text>
@@ -99,15 +104,28 @@ interface NumberStepperProps {
 function NumberStepper({ label, value, format, onDecrement, onIncrement }: NumberStepperProps) {
   return (
     <View style={styles.stepperColumn}>
-      <Pressable onPress={onIncrement} style={styles.stepperButton} accessibilityLabel={`Increase ${label}`}>
+      <Pressable
+        onPress={onIncrement}
+        style={styles.stepperButton}
+        accessibilityLabel={`Increase ${label}`}
+      >
         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-          <Path d="M12 5 V19 M5 12 H19" stroke={brand.deep} strokeWidth={2.5} strokeLinecap="round" />
+          <Path
+            d="M12 5 V19 M5 12 H19"
+            stroke={brand.deep}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
         </Svg>
       </Pressable>
       <Text allowFontScaling style={styles.stepperValue}>
         {format ? format(value) : value}
       </Text>
-      <Pressable onPress={onDecrement} style={styles.stepperButton} accessibilityLabel={`Decrease ${label}`}>
+      <Pressable
+        onPress={onDecrement}
+        style={styles.stepperButton}
+        accessibilityLabel={`Decrease ${label}`}
+      >
         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
           <Path d="M6 12 H18" stroke={brand.deep} strokeWidth={2.5} strokeLinecap="round" />
         </Svg>

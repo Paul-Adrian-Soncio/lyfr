@@ -1,0 +1,8 @@
+# Always LF in the working copy, whatever core.autocrlf says. Biome formats
+# to LF; without this, Windows checkouts convert to CRLF and every file then
+# fails `biome check`.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jar binary

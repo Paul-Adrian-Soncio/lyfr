@@ -11,10 +11,14 @@ import { useLiveQuery } from "drizzle-orm/expo-sqlite";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { type DoseActivity, doseActivity } from "@/domain/doseActivity";
-import { correctionOptions, type EffectiveStatus, effectiveStatus, summarizeDay } from "@/domain/doseStatus";
+import {
+  correctionOptions,
+  type EffectiveStatus,
+  effectiveStatus,
+  summarizeDay,
+} from "@/domain/doseStatus";
 import type { MedicationForm } from "@/domain/medication";
 import { correctDose } from "@/scheduling/doseActions";
 import {
@@ -24,10 +28,11 @@ import {
   weekDays,
   weekOccurrencesQuery,
 } from "@/scheduling/historyOccurrences";
+import { brand, iconColorOn, light, radii, typography } from "@/theme/tokens";
 import { StatusDot, StatusPill } from "@/ui/DoseStatusBadge";
 import { FormIcon } from "@/ui/FormIcon";
+import { Pressable } from "@/ui/Pressable";
 import { useToday } from "@/ui/useToday";
-import { brand, iconColorOn, light, radii, typography } from "@/theme/tokens";
 
 const CORRECTION_LABELS: Record<EffectiveStatus, string> = {
   taken: "It was taken",
@@ -113,14 +118,19 @@ export default function HistoryScreen() {
         { text: "Cancel", style: "cancel" },
         { text: CORRECTION_LABELS[a], onPress: () => correctDose(row.id, current, a) },
         { text: CORRECTION_LABELS[b], onPress: () => correctDose(row.id, current, b) },
-      ]
+      ],
     );
   }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.main}>
       <View style={styles.titleRow}>
-        <Pressable onPress={() => router.back()} style={styles.iconButton} hitSlop={8} accessibilityLabel="Back">
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.iconButton}
+          hitSlop={8}
+          accessibilityLabel="Back"
+        >
           <Chevron direction="left" color={brand.deep} />
         </Pressable>
         <Text allowFontScaling style={styles.title}>
@@ -167,7 +177,11 @@ export default function HistoryScreen() {
               <Text allowFontScaling style={styles.dayNumber}>
                 {day.getDate()}
               </Text>
-              {summary.overall ? <StatusDot status={summary.overall} /> : <View style={styles.dotPlaceholder} />}
+              {summary.overall ? (
+                <StatusDot status={summary.overall} />
+              ) : (
+                <View style={styles.dotPlaceholder} />
+              )}
               <Text allowFontScaling style={styles.dayCount}>
                 {summary.total > 0 ? `${summary.taken}/${summary.total}` : "–"}
               </Text>
@@ -179,7 +193,11 @@ export default function HistoryScreen() {
       <View style={styles.daySection}>
         <View style={styles.dayHeader}>
           <Text allowFontScaling style={styles.dayTitle}>
-            {selectedDay.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
+            {selectedDay.toLocaleDateString(undefined, {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
           </Text>
           {selectedSummary.total > 0 && (
             <Text allowFontScaling style={styles.dayHeaderCount}>
@@ -240,7 +258,9 @@ function DoseRow({
           </Text>
           <Text allowFontScaling style={styles.doseMeta}>
             {formatTime(row.scheduledAt)}
-            {medication.doseAmount ? ` · ${medication.doseAmount} ${medication.doseUnit ?? ""}` : ""}
+            {medication.doseAmount
+              ? ` · ${medication.doseAmount} ${medication.doseUnit ?? ""}`
+              : ""}
           </Text>
         </View>
         <StatusPill status={status} />

@@ -25,21 +25,56 @@ export interface FormMeta {
 // poorly-countable there — the UI must label their supply as estimated and
 // prompt for manual correction more readily than other forms.
 export const formMeta: Record<MedicationForm, FormMeta> = {
-  tablet: { label: "Tablet", doseUnit: "tablet", supplyUnit: "tablets", supplyPoorlyCountable: false },
-  capsule: { label: "Capsule", doseUnit: "capsule", supplyUnit: "capsules", supplyPoorlyCountable: false },
-  liquid: { label: "Liquid", doseUnit: "ml", supplyUnit: "ml in bottle", supplyPoorlyCountable: false },
-  injection: { label: "Injection", doseUnit: "units/IU or mg", supplyUnit: "pens/vials", supplyPoorlyCountable: false },
+  tablet: {
+    label: "Tablet",
+    doseUnit: "tablet",
+    supplyUnit: "tablets",
+    supplyPoorlyCountable: false,
+  },
+  capsule: {
+    label: "Capsule",
+    doseUnit: "capsule",
+    supplyUnit: "capsules",
+    supplyPoorlyCountable: false,
+  },
+  liquid: {
+    label: "Liquid",
+    doseUnit: "ml",
+    supplyUnit: "ml in bottle",
+    supplyPoorlyCountable: false,
+  },
+  injection: {
+    label: "Injection",
+    doseUnit: "units/IU or mg",
+    supplyUnit: "pens/vials",
+    supplyPoorlyCountable: false,
+  },
   drops: { label: "Drops", doseUnit: "drops", supplyUnit: "drops", supplyPoorlyCountable: true },
-  inhaler: { label: "Inhaler", doseUnit: "puffs", supplyUnit: "puffs", supplyPoorlyCountable: true },
+  inhaler: {
+    label: "Inhaler",
+    doseUnit: "puffs",
+    supplyUnit: "puffs",
+    supplyPoorlyCountable: true,
+  },
   patch: { label: "Patch", doseUnit: "patch", supplyUnit: "patches", supplyPoorlyCountable: false },
-  topical: { label: "Topical", doseUnit: "application", supplyUnit: "tubes", supplyPoorlyCountable: false },
+  topical: {
+    label: "Topical",
+    doseUnit: "application",
+    supplyUnit: "tubes",
+    supplyPoorlyCountable: false,
+  },
   // Not in CLAUDE.md §5's original form table — added per the developer's
   // request 2026-09-23. Behaves like tablet/capsule: count-based dosing,
   // reliably countable supply. Kept as its own form (not merged into
   // tablet/capsule) so the medicine list and icon can visually distinguish
   // supplements from prescription medications, which the target users
   // (per CLAUDE.md §1) are likely to be juggling side by side.
-  vitamin: { label: "Vitamin", doseUnit: "tablet", supplyUnit: "tablets", supplyPoorlyCountable: false },
+  vitamin: {
+    label: "Vitamin",
+    doseUnit: "tablet",
+    supplyUnit: "tablets",
+    supplyPoorlyCountable: false,
+  },
 };
 
 export interface Medication {

@@ -7,8 +7,8 @@
 // reliability — see src/scheduling/heartbeat.ts for why launch-time
 // reconciliation is what actually matters.
 
-import notifee, { EventType } from "@notifee/react-native";
 import type { Event } from "@notifee/react-native";
+import notifee, { EventType } from "@notifee/react-native";
 import { NOTIFICATION_ACTION } from "./AndroidScheduler";
 import { markSkipped, markTaken, snooze } from "./doseActions";
 import { logObservedFire } from "./heartbeat";

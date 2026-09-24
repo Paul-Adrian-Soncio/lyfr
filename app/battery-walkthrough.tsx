@@ -13,15 +13,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AppState, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import {
   checkDeviceSupport,
   type DeviceSupport,
   walkthroughSteps,
 } from "@/scheduling/batteryWalkthrough";
-import { LyfrLogo } from "@/ui/LyfrLogo";
 import { brand, buttonHeights, light, radii, typography } from "@/theme/tokens";
+import { LyfrLogo } from "@/ui/LyfrLogo";
+import { Pressable } from "@/ui/Pressable";
 
 type StepStatus = "unknown" | "satisfied" | "unsatisfied";
 
@@ -35,7 +35,7 @@ export default function BatteryWalkthroughScreen() {
         if (!step.checkable) return [step.id, "unknown"] as const;
         const satisfied = await step.isSatisfied();
         return [step.id, satisfied ? "satisfied" : "unsatisfied"] as const;
-      })
+      }),
     );
     setStatuses(Object.fromEntries(results));
   }, []);

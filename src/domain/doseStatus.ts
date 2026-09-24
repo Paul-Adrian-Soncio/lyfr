@@ -13,7 +13,7 @@ export const MISSED_GRACE_MS = 2 * 60 * 60 * 1000;
 
 export function effectiveStatus(
   occurrence: { status: string; scheduledAt: number },
-  now: number
+  now: number,
 ): EffectiveStatus {
   switch (occurrence.status) {
     case "taken":

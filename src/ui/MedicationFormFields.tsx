@@ -5,12 +5,12 @@
 
 import { Image } from "expo-image";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { formMeta, type MedicationForm } from "@/domain/medication";
 import { captureMedicationPhoto, resolveMedicationPhotoUri } from "@/domain/medicationPhoto";
-import { FormIcon } from "@/ui/FormIcon";
 import { brand, light, medicationTags, radii, typography } from "@/theme/tokens";
+import { FormIcon } from "@/ui/FormIcon";
+import { Pressable } from "@/ui/Pressable";
 
 const FORM_ORDER: MedicationForm[] = [
   "tablet",
@@ -128,7 +128,9 @@ export function MedicationFormFields({ state, onChange, headerExtra }: Medicatio
         <View style={styles.doseRow}>
           <View style={styles.stepper}>
             <Pressable
-              onPress={() => onChange({ ...state, doseAmount: Math.max(0.5, state.doseAmount - 0.5) })}
+              onPress={() =>
+                onChange({ ...state, doseAmount: Math.max(0.5, state.doseAmount - 0.5) })
+              }
               style={styles.stepperButton}
               hitSlop={8}
             >

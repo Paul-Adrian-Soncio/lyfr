@@ -42,7 +42,7 @@ export function todayOccurrencesQuery(now: Date = new Date()) {
   return db.query.doseOccurrences.findMany({
     where: and(
       gte(doseOccurrences.scheduledAt, startOfDay(now)),
-      lt(doseOccurrences.scheduledAt, endOfDay(now) + 1)
+      lt(doseOccurrences.scheduledAt, endOfDay(now) + 1),
     ),
     orderBy: asc(doseOccurrences.scheduledAt),
     with: {

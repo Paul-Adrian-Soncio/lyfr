@@ -23,6 +23,7 @@ function msUntilMidnight(): number {
 export function useToday(): Date {
   const [key, setKey] = useState(dayKey);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` re-arms the timer for the next midnight once this one fires. Without it the rollover works once, then never again.
   useEffect(() => {
     // Timers don't run while the app is suspended, so the foreground
     // check below is what actually catches most rollovers; the timer

@@ -10,13 +10,13 @@ import * as Crypto from "expo-crypto";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { db } from "@/db/client";
 import { medications } from "@/db/schema";
 import { formMeta } from "@/domain/medication";
-import { MedicationFormFields, type MedicationFormState } from "@/ui/MedicationFormFields";
 import { brand, light, medicationTags, radii } from "@/theme/tokens";
+import { MedicationFormFields, type MedicationFormState } from "@/ui/MedicationFormFields";
+import { Pressable } from "@/ui/Pressable";
 
 export default function AddMedicationScreen() {
   const [state, setState] = useState<MedicationFormState>({
@@ -45,7 +45,10 @@ export default function AddMedicationScreen() {
         doseAmount: String(state.doseAmount),
         doseUnit: formMeta[state.form].doseUnit,
       });
-      router.push({ pathname: "/schedule-medication/[medicationId]", params: { medicationId: id } });
+      router.push({
+        pathname: "/schedule-medication/[medicationId]",
+        params: { medicationId: id },
+      });
     } finally {
       setSaving(false);
     }

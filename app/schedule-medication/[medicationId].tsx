@@ -12,12 +12,13 @@ import * as Crypto from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { db } from "@/db/client";
 import { medications, regimens } from "@/db/schema";
 import type { Regimen } from "@/domain/regimen";
 import { AndroidScheduler } from "@/scheduling/AndroidScheduler";
+import { brand, light, radii, typography } from "@/theme/tokens";
+import { Pressable } from "@/ui/Pressable";
 import {
   addDays,
   buildRuleFromState,
@@ -25,7 +26,6 @@ import {
   type ScheduleFormState,
   toDateString,
 } from "@/ui/ScheduleFormFields";
-import { brand, light, radii, typography } from "@/theme/tokens";
 
 export default function ScheduleMedicationScreen() {
   const { medicationId } = useLocalSearchParams<{ medicationId: string }>();
@@ -86,7 +86,7 @@ export default function ScheduleMedicationScreen() {
     } catch (e) {
       Alert.alert(
         "Couldn't set up reminders",
-        e instanceof Error ? e.message : "Something went wrong."
+        e instanceof Error ? e.message : "Something went wrong.",
       );
     } finally {
       setSaving(false);

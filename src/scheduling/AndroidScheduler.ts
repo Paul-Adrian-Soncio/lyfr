@@ -110,7 +110,7 @@ export const NOTIFICATION_ACTION = {
 export async function scheduleOccurrenceNotification(
   occurrenceId: string,
   medicationName: string,
-  scheduledAt: number
+  scheduledAt: number,
 ): Promise<void> {
   await notifee.createTriggerNotification(
     {
@@ -134,7 +134,7 @@ export async function scheduleOccurrenceNotification(
       type: TriggerType.TIMESTAMP,
       timestamp: scheduledAt,
       alarmManager: { type: AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE },
-    }
+    },
   );
 }
 
@@ -155,7 +155,7 @@ async function syncOccurrences(regimen: Regimen, medicationName: string): Promis
   // only "upcoming" rows, which re-booked any dose already taken today on
   // every refill. Both found 2026-09-24/25 — see STATE.md.
   const handledTimes = new Set(
-    existing.filter((row) => row.status !== "cancelled").map((row) => row.scheduledAt)
+    existing.filter((row) => row.status !== "cancelled").map((row) => row.scheduledAt),
   );
 
   for (const occurrence of generated) {

@@ -35,7 +35,7 @@ export function weekOccurrencesQuery(lastDay: Date) {
     where: and(
       gte(doseOccurrences.scheduledAt, from),
       lt(doseOccurrences.scheduledAt, to.getTime()),
-      ne(doseOccurrences.status, "cancelled")
+      ne(doseOccurrences.status, "cancelled"),
     ),
     orderBy: asc(doseOccurrences.scheduledAt),
     with: {

@@ -64,7 +64,7 @@ export default function DozeSpikeScreen() {
         type: TriggerType.TIMESTAMP,
         timestamp: fireAt,
         alarmManager: { type: AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE },
-      }
+      },
     );
 
     append(`scheduled id=${id} for ${new Date(fireAt).toLocaleTimeString()}`);
@@ -81,8 +81,7 @@ export default function DozeSpikeScreen() {
         Doze spike
       </Text>
       <Text allowFontScaling style={styles.body}>
-        Schedule an exact alarm, then lock the tablet, turn the screen off,
-        unplug it, and wait.
+        Schedule an exact alarm, then lock the tablet, turn the screen off, unplug it, and wait.
       </Text>
       <View style={styles.buttonRow}>
         <Button title="Schedule in 2 min" onPress={() => scheduleTestAlarm(2)} />
@@ -90,6 +89,7 @@ export default function DozeSpikeScreen() {
       </View>
       <Button title="Check pending count" onPress={checkPending} />
       {log.map((line, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: throwaway dev log; lines are plain text with no state.
         <Text allowFontScaling key={i} style={styles.logLine}>
           {line}
         </Text>

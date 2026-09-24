@@ -70,7 +70,11 @@ export async function snooze(occurrenceId: string): Promise<void> {
  * its grace period is stored as "upcoming" but was shown and corrected as
  * "missed", and the audit trail should say so.
  */
-export function correctDose(occurrenceId: string, previous: EffectiveStatus, next: EffectiveStatus): void {
+export function correctDose(
+  occurrenceId: string,
+  previous: EffectiveStatus,
+  next: EffectiveStatus,
+): void {
   const now = Date.now();
   db.transaction((tx) => {
     tx.insert(doseEdits)

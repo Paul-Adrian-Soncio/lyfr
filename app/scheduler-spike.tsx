@@ -38,12 +38,12 @@ export default function SchedulerSpikeScreen() {
       const now = new Date();
       const inTwoMin = new Date(now.getTime() + 2 * 60_000);
       const time = `${String(inTwoMin.getHours()).padStart(2, "0")}:${String(
-        inTwoMin.getMinutes()
+        inTwoMin.getMinutes(),
       ).padStart(2, "0")}`;
 
       const regimenId = Crypto.randomUUID();
       const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-        now.getDate()
+        now.getDate(),
       ).padStart(2, "0")}`;
 
       const regimen: Regimen = {
@@ -75,7 +75,7 @@ export default function SchedulerSpikeScreen() {
       append(`dose_occurrences for this regimen: ${rows.length}`);
       for (const row of rows) {
         append(
-          `  id=${row.id.slice(0, 8)} scheduledAt=${new Date(row.scheduledAt).toLocaleTimeString()} notifId=${row.actualNotificationId?.slice(0, 8)}`
+          `  id=${row.id.slice(0, 8)} scheduledAt=${new Date(row.scheduledAt).toLocaleTimeString()} notifId=${row.actualNotificationId?.slice(0, 8)}`,
         );
       }
 
@@ -90,11 +90,11 @@ export default function SchedulerSpikeScreen() {
     try {
       const result = await reconcile();
       append(
-        `reconcile() -> ${result.suspectedMisses.length} suspected misses, ${result.confirmed} confirmed`
+        `reconcile() -> ${result.suspectedMisses.length} suspected misses, ${result.confirmed} confirmed`,
       );
       for (const miss of result.suspectedMisses) {
         append(
-          `  MISS occurrenceId=${miss.occurrenceId.slice(0, 8)} expectedFireAt=${new Date(miss.expectedFireAt).toLocaleTimeString()}`
+          `  MISS occurrenceId=${miss.occurrenceId.slice(0, 8)} expectedFireAt=${new Date(miss.expectedFireAt).toLocaleTimeString()}`,
         );
       }
     } catch (e) {
@@ -108,12 +108,13 @@ export default function SchedulerSpikeScreen() {
         Scheduler spike
       </Text>
       <Text allowFontScaling style={styles.body}>
-        Creates a throwaway medication + regimen firing in ~2 minutes, syncs
-        it through AndroidScheduler, and reports what happened.
+        Creates a throwaway medication + regimen firing in ~2 minutes, syncs it through
+        AndroidScheduler, and reports what happened.
       </Text>
       <Button title="Run test" onPress={runTest} />
       <Button title="Check reconcile()" onPress={runReconcile} />
       {log.map((line, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: throwaway dev log; lines are plain text with no state.
         <Text allowFontScaling key={i} style={styles.logLine}>
           {line}
         </Text>

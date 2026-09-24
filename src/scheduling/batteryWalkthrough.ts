@@ -32,7 +32,7 @@ export const batteryOptimizationStep: WalkthroughStep = {
   // that out explicitly, a user would hit a dead end (app not in the list)
   // and likely give up. See STATE.md.
   description:
-    "On the next screen, if you don't see Lyfr in the list, switch the filter to \"All apps.\" Then choose Lyfr and select \"Don't optimise\" or \"Unrestricted.\"",
+    'On the next screen, if you don\'t see Lyfr in the list, switch the filter to "All apps." Then choose Lyfr and select "Don\'t optimise" or "Unrestricted."',
   checkable: true,
   isSatisfied: async () => {
     const enabled = await notifee.isBatteryOptimizationEnabled();

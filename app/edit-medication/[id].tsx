@@ -9,14 +9,14 @@ import { and, eq } from "drizzle-orm";
 import { Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { db } from "@/db/client";
 import { medications, regimens } from "@/db/schema";
 import { formMeta, type MedicationForm } from "@/domain/medication";
 import { AndroidScheduler } from "@/scheduling/AndroidScheduler";
-import { MedicationFormFields, type MedicationFormState } from "@/ui/MedicationFormFields";
 import { brand, light, radii, typography } from "@/theme/tokens";
+import { MedicationFormFields, type MedicationFormState } from "@/ui/MedicationFormFields";
+import { Pressable } from "@/ui/Pressable";
 
 export default function EditMedicationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,7 +73,7 @@ export default function EditMedicationScreen() {
       [
         { text: "Cancel", style: "cancel" },
         { text: "Archive", style: "destructive", onPress: handleArchiveConfirmed },
-      ]
+      ],
     );
   }
 
@@ -86,7 +86,10 @@ export default function EditMedicationScreen() {
     });
     for (const regimen of active) {
       await AndroidScheduler.cancelRegimen(regimen.id);
-      await db.update(regimens).set({ active: false, updatedAt: Date.now() }).where(eq(regimens.id, regimen.id));
+      await db
+        .update(regimens)
+        .set({ active: false, updatedAt: Date.now() })
+        .where(eq(regimens.id, regimen.id));
     }
     await db.update(medications).set({ archivedAt: Date.now() }).where(eq(medications.id, id));
     router.back();
@@ -139,7 +142,10 @@ export default function EditMedicationScreen() {
       <MedicationFormFields state={state} onChange={setState} />
 
       <View style={styles.footer}>
-        <Link href={{ pathname: "/edit-schedule/[medicationId]", params: { medicationId: id } }} asChild>
+        <Link
+          href={{ pathname: "/edit-schedule/[medicationId]", params: { medicationId: id } }}
+          asChild
+        >
           <Pressable style={styles.editScheduleButton}>
             <Text allowFontScaling style={styles.editScheduleText}>
               Edit schedule

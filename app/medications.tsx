@@ -11,17 +11,21 @@ import { useLiveQuery } from "drizzle-orm/expo-sqlite";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { FlatList, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import { db } from "@/db/client";
 import { medications } from "@/db/schema";
 import { formMeta, type MedicationForm } from "@/domain/medication";
 import { resolveMedicationPhotoUri } from "@/domain/medicationPhoto";
-import { FormIcon } from "@/ui/FormIcon";
 import { brand, light, radii, typography } from "@/theme/tokens";
+import { FormIcon } from "@/ui/FormIcon";
+import { Pressable } from "@/ui/Pressable";
 
 export default function MedicationsScreen() {
   const { data } = useLiveQuery(
-    db.select().from(medications).where(isNull(medications.archivedAt)).orderBy(desc(medications.createdAt))
+    db
+      .select()
+      .from(medications)
+      .where(isNull(medications.archivedAt))
+      .orderBy(desc(medications.createdAt)),
   );
 
   const rows = data ?? [];

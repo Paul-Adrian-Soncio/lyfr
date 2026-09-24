@@ -20,8 +20,21 @@ function colorFor(status: EffectiveStatus): string {
   return status === "upcoming" ? doseStatus.upcoming.outline : doseStatus[status].fill;
 }
 
-export function StatusIcon({ status, size = 16, color }: { status: EffectiveStatus; size?: number; color: string }) {
-  const stroke = { stroke: color, strokeWidth: status === "upcoming" ? 2.5 : 3, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+export function StatusIcon({
+  status,
+  size = 16,
+  color,
+}: {
+  status: EffectiveStatus;
+  size?: number;
+  color: string;
+}) {
+  const stroke = {
+    stroke: color,
+    strokeWidth: status === "upcoming" ? 2.5 : 3,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       {status === "taken" && <Path d="M5 12.5 l4.5 4.5 L19 7.5" {...stroke} />}

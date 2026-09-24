@@ -4,10 +4,10 @@
 // container path itself changes between installs and OS updates, so an
 // absolute path stored today would break later.
 
+import * as Crypto from "expo-crypto";
+import { Directory, File, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { Directory, File, Paths } from "expo-file-system";
-import * as Crypto from "expo-crypto";
 
 const PHOTOS_SUBDIR = "medication-photos";
 const LONG_EDGE_PX = 800;

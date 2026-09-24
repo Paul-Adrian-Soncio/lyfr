@@ -1,27 +1,24 @@
 import { describe, expect, it } from "vitest";
-import {
-  correctionOptions,
-  effectiveStatus,
-  MISSED_GRACE_MS,
-  summarizeDay,
-} from "./doseStatus";
+import { correctionOptions, effectiveStatus, MISSED_GRACE_MS, summarizeDay } from "./doseStatus";
 
 const scheduledAt = Date.UTC(2026, 8, 24, 8, 0);
 
 describe("effectiveStatus", () => {
   it("keeps an untouched dose upcoming before its time", () => {
-    expect(effectiveStatus({ status: "upcoming", scheduledAt }, scheduledAt - 60_000)).toBe("upcoming");
+    expect(effectiveStatus({ status: "upcoming", scheduledAt }, scheduledAt - 60_000)).toBe(
+      "upcoming",
+    );
   });
 
   it("keeps an untouched dose upcoming through the grace period", () => {
-    expect(effectiveStatus({ status: "upcoming", scheduledAt }, scheduledAt + MISSED_GRACE_MS)).toBe(
-      "upcoming"
-    );
+    expect(
+      effectiveStatus({ status: "upcoming", scheduledAt }, scheduledAt + MISSED_GRACE_MS),
+    ).toBe("upcoming");
   });
 
   it("marks an untouched dose missed once the grace period has passed", () => {
     expect(
-      effectiveStatus({ status: "upcoming", scheduledAt }, scheduledAt + MISSED_GRACE_MS + 1)
+      effectiveStatus({ status: "upcoming", scheduledAt }, scheduledAt + MISSED_GRACE_MS + 1),
     ).toBe("missed");
   });
 

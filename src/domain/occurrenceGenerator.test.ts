@@ -18,7 +18,10 @@ function toLocalStrings(occurrences: { scheduledAt: number }[]): string[] {
   return occurrences
     .map((o) => new Date(o.scheduledAt))
     .sort((a, b) => a.getTime() - b.getTime())
-    .map((d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    .map(
+      (d) =>
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    );
 }
 
 function pad(n: number): string {

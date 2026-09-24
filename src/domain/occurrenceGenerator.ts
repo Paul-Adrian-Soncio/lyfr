@@ -25,7 +25,7 @@ export interface GeneratedOccurrence {
 export function generateOccurrences(
   regimen: Regimen,
   windowStart: string,
-  windowEnd: string
+  windowEnd: string,
 ): GeneratedOccurrence[] {
   if (!regimen.active) return [];
 
@@ -88,7 +88,9 @@ function daysBetween(fromDay: string, toDay: string): number {
 function* eachLocalDate(start: string, end: string): Generator<string> {
   const [y, m, d] = parseDate(start);
   const cursor = new Date(Date.UTC(y, m - 1, d));
-  const endMs = Date.UTC(...parseDate(end).map((n, i) => (i === 1 ? n - 1 : n)) as [number, number, number]);
+  const endMs = Date.UTC(
+    ...(parseDate(end).map((n, i) => (i === 1 ? n - 1 : n)) as [number, number, number]),
+  );
   while (cursor.getTime() <= endMs) {
     yield formatDate(cursor);
     cursor.setUTCDate(cursor.getUTCDate() + 1);

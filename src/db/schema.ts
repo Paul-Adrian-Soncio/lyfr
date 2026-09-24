@@ -15,12 +15,8 @@ export const medications = sqliteTable("medications", {
   supplyRemaining: integer("supply_remaining"),
   supplyThreshold: integer("supply_threshold"),
   archivedAt: integer("archived_at"),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch('subsec') * 1000)`),
-  updatedAt: integer("updated_at")
-    .notNull()
-    .default(sql`(unixepoch('subsec') * 1000)`),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch('subsec') * 1000)`),
+  updatedAt: integer("updated_at").notNull().default(sql`(unixepoch('subsec') * 1000)`),
 });
 
 export const regimens = sqliteTable("regimens", {
@@ -35,12 +31,8 @@ export const regimens = sqliteTable("regimens", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch('subsec') * 1000)`),
-  updatedAt: integer("updated_at")
-    .notNull()
-    .default(sql`(unixepoch('subsec') * 1000)`),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch('subsec') * 1000)`),
+  updatedAt: integer("updated_at").notNull().default(sql`(unixepoch('subsec') * 1000)`),
 });
 
 export const doseOccurrences = sqliteTable("dose_occurrences", {
@@ -56,9 +48,7 @@ export const doseOccurrences = sqliteTable("dose_occurrences", {
   snoozeCount: integer("snooze_count").notNull().default(0),
   lastSnoozedAt: integer("last_snoozed_at"),
   actualNotificationId: text("actual_notification_id"),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch('subsec') * 1000)`),
+  createdAt: integer("created_at").notNull().default(sql`(unixepoch('subsec') * 1000)`),
 });
 
 export const doseEdits = sqliteTable("dose_edits", {
@@ -70,9 +60,7 @@ export const doseEdits = sqliteTable("dose_edits", {
   newStatus: text("new_status").notNull(),
   previousTime: integer("previous_time"),
   newTime: integer("new_time"),
-  editedAt: integer("edited_at")
-    .notNull()
-    .default(sql`(unixepoch('subsec') * 1000)`),
+  editedAt: integer("edited_at").notNull().default(sql`(unixepoch('subsec') * 1000)`),
 });
 
 export const notificationLog = sqliteTable("notification_log", {

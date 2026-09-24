@@ -33,7 +33,10 @@ export function doseActivity(dose: DoseActivityInput): DoseActivity[] {
       from: latestEdit.previousStatus,
       to: latestEdit.newStatus,
     });
-  } else if ((dose.status === "taken" || dose.status === "skipped") && dose.acknowledgedAt != null) {
+  } else if (
+    (dose.status === "taken" || dose.status === "skipped") &&
+    dose.acknowledgedAt != null
+  ) {
     activity.push({ kind: dose.status, at: dose.acknowledgedAt });
   }
 

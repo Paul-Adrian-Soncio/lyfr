@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { doseActivity, type DoseActivityInput } from "./doseActivity";
+import { type DoseActivityInput, doseActivity } from "./doseActivity";
 
 const base: DoseActivityInput = {
   status: "upcoming",
@@ -22,7 +22,13 @@ describe("doseActivity", () => {
 
   it("shows the snooze before the outcome", () => {
     expect(
-      doseActivity({ ...base, status: "taken", acknowledgedAt: 300, snoozeCount: 2, lastSnoozedAt: 200 })
+      doseActivity({
+        ...base,
+        status: "taken",
+        acknowledgedAt: 300,
+        snoozeCount: 2,
+        lastSnoozedAt: 200,
+      }),
     ).toEqual([
       { kind: "snoozed", at: 200, count: 2 },
       { kind: "taken", at: 300 },
@@ -45,7 +51,7 @@ describe("doseActivity", () => {
           { previousStatus: "skipped", newStatus: "taken", editedAt: 900 },
           { previousStatus: "missed", newStatus: "skipped", editedAt: 500 },
         ],
-      })
+      }),
     ).toEqual([{ kind: "changed", at: 900, from: "skipped", to: "taken" }]);
   });
 });

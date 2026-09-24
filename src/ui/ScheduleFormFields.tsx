@@ -4,11 +4,11 @@
 // the three V1 rule types this supports.
 
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import type { LocalTime, RuleConfig, Weekday } from "@/domain/regimen";
-import { TimeStepper } from "@/ui/TimeStepper";
 import { brand, light, radii, typography } from "@/theme/tokens";
+import { Pressable } from "@/ui/Pressable";
+import { TimeStepper } from "@/ui/TimeStepper";
 
 export type RuleType = RuleConfig["type"];
 
@@ -160,7 +160,9 @@ export function ScheduleFormFields({ state, onChange, headerExtra }: ScheduleFor
           <View style={styles.intervalRow}>
             <View style={styles.stepper}>
               <Pressable
-                onPress={() => onChange({ ...state, intervalDays: Math.max(2, state.intervalDays - 1) })}
+                onPress={() =>
+                  onChange({ ...state, intervalDays: Math.max(2, state.intervalDays - 1) })
+                }
                 style={styles.stepperButton}
                 hitSlop={8}
               >
@@ -198,10 +200,15 @@ export function ScheduleFormFields({ state, onChange, headerExtra }: ScheduleFor
           What time{state.times.length > 1 ? "s" : ""}
         </Text>
         {state.times.map((time, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: rows are fully controlled by `state.times` and hold no state of their own, so position is the right identity.
           <View key={index} style={styles.timeRow}>
             <TimeStepper value={time} onChange={(value) => updateTime(index, value)} />
             {state.times.length > 1 && (
-              <Pressable onPress={() => removeTime(index)} hitSlop={8} style={styles.removeTimeButton}>
+              <Pressable
+                onPress={() => removeTime(index)}
+                hitSlop={8}
+                style={styles.removeTimeButton}
+              >
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
                   <Path
                     d="M6 6 L18 18 M6 18 L18 6"
@@ -285,15 +292,29 @@ function DateStepperRow({
         disabled={atMin}
       >
         <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-          <Path d="M6 12 H18" stroke={atMin ? light.textMuted : brand.deep} strokeWidth={2.5} strokeLinecap="round" />
+          <Path
+            d="M6 12 H18"
+            stroke={atMin ? light.textMuted : brand.deep}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
         </Svg>
       </Pressable>
       <Text allowFontScaling style={styles.dateValue}>
         {formatDateForDisplay(dateString)}
       </Text>
-      <Pressable onPress={() => onChange(addDays(dateString, 1))} style={styles.stepperButton} hitSlop={8}>
+      <Pressable
+        onPress={() => onChange(addDays(dateString, 1))}
+        style={styles.stepperButton}
+        hitSlop={8}
+      >
         <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-          <Path d="M12 5 V19 M5 12 H19" stroke={brand.deep} strokeWidth={2.5} strokeLinecap="round" />
+          <Path
+            d="M12 5 V19 M5 12 H19"
+            stroke={brand.deep}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
         </Svg>
       </Pressable>
     </View>

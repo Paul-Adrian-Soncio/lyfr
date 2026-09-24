@@ -4,9 +4,9 @@
 
 import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { doseStatus, typography } from "@/theme/tokens";
+import { Pressable } from "@/ui/Pressable";
 import { useReliabilityStore } from "./reliabilityStore";
 
 export function ReliabilityBanner() {

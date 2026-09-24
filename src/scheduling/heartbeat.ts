@@ -25,7 +25,7 @@ import { notificationLog } from "@/db/schema";
 export async function logExpectedFire(
   occurrenceId: string,
   expectedFireAt: number,
-  channel: string
+  channel: string,
 ): Promise<void> {
   await db.insert(notificationLog).values({
     id: Crypto.randomUUID(),
@@ -81,12 +81,12 @@ export async function reconcile(now: number = Date.now()): Promise<ReconcileResu
  */
 export async function logObservedFire(
   occurrenceId: string,
-  observedFireAt: number = Date.now()
+  observedFireAt: number = Date.now(),
 ): Promise<void> {
   await db
     .update(notificationLog)
     .set({ observedFireAt })
     .where(
-      and(eq(notificationLog.occurrenceId, occurrenceId), isNull(notificationLog.observedFireAt))
+      and(eq(notificationLog.occurrenceId, occurrenceId), isNull(notificationLog.observedFireAt)),
     );
 }

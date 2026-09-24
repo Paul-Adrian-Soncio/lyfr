@@ -5,7 +5,12 @@
 // element in the app rather than importing Pressable from react-native.
 
 import type { ComponentProps } from "react";
-import { Pressable as RNPressable, type PressableStateCallbackType, type StyleProp, type ViewStyle } from "react-native";
+import {
+  type PressableStateCallbackType,
+  Pressable as RNPressable,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 type Props = ComponentProps<typeof RNPressable>;
 

@@ -15,27 +15,39 @@ import { and, eq } from "drizzle-orm";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { db } from "@/db/client";
 import { medications, regimens } from "@/db/schema";
 import type { Regimen, RuleConfig } from "@/domain/regimen";
 import { AndroidScheduler } from "@/scheduling/AndroidScheduler";
+import { brand, light, radii, typography } from "@/theme/tokens";
+import { Pressable } from "@/ui/Pressable";
 import {
   buildRuleFromState,
   ScheduleFormFields,
   type ScheduleFormState,
 } from "@/ui/ScheduleFormFields";
-import { brand, light, radii, typography } from "@/theme/tokens";
 
-function ruleToFormFields(rule: RuleConfig): Pick<ScheduleFormState, "ruleType" | "times" | "weekdays" | "intervalDays"> {
+function ruleToFormFields(
+  rule: RuleConfig,
+): Pick<ScheduleFormState, "ruleType" | "times" | "weekdays" | "intervalDays"> {
   if (rule.type === "fixed_daily") {
     return { ruleType: "fixed_daily", times: rule.times, weekdays: [1, 3, 5], intervalDays: 2 };
   }
   if (rule.type === "specific_weekdays") {
-    return { ruleType: "specific_weekdays", times: rule.times, weekdays: rule.weekdays, intervalDays: 2 };
+    return {
+      ruleType: "specific_weekdays",
+      times: rule.times,
+      weekdays: rule.weekdays,
+      intervalDays: 2,
+    };
   }
-  return { ruleType: "every_n_days", times: rule.times, weekdays: [1, 3, 5], intervalDays: rule.intervalDays };
+  return {
+    ruleType: "every_n_days",
+    times: rule.times,
+    weekdays: [1, 3, 5],
+    intervalDays: rule.intervalDays,
+  };
 }
 
 export default function EditScheduleScreen() {
@@ -63,7 +75,7 @@ export default function EditScheduleScreen() {
       if (!regimen) {
         Alert.alert(
           "No schedule yet",
-          "This medicine doesn't have a schedule set up. Add one from the medicine's edit screen."
+          "This medicine doesn't have a schedule set up. Add one from the medicine's edit screen.",
         );
         router.back();
         return;
@@ -123,7 +135,7 @@ export default function EditScheduleScreen() {
     } catch (e) {
       Alert.alert(
         "Couldn't update reminders",
-        e instanceof Error ? e.message : "Something went wrong."
+        e instanceof Error ? e.message : "Something went wrong.",
       );
     } finally {
       setSaving(false);

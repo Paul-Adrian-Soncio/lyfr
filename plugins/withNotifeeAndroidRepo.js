@@ -13,7 +13,7 @@ function withNotifeeAndroidRepo(config) {
     }
     config.modResults.contents = config.modResults.contents.replace(
       /allprojects\s*{\s*repositories\s*{/,
-      `allprojects {\n  repositories {\n    maven { url "$rootDir/../node_modules/${marker}" }`
+      `allprojects {\n  repositories {\n    maven { url "$rootDir/../node_modules/${marker}" }`,
     );
     return config;
   });

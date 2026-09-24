@@ -11,16 +11,16 @@ import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { formMeta, type MedicationForm } from "@/domain/medication";
 import { resolveMedicationPhotoUri } from "@/domain/medicationPhoto";
 import { markSkipped, markTaken, snooze } from "@/scheduling/doseActions";
 import { mapTodayOccurrences, todayOccurrencesQuery } from "@/scheduling/todayOccurrences";
+import { brand, light, radii, typography } from "@/theme/tokens";
 import { FormIcon } from "@/ui/FormIcon";
 import { LyfrLogo } from "@/ui/LyfrLogo";
+import { Pressable } from "@/ui/Pressable";
 import { useToday } from "@/ui/useToday";
-import { brand, light, radii, typography } from "@/theme/tokens";
 
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -36,7 +36,9 @@ export default function TodayScreen() {
   const occurrences = mapTodayOccurrences(data ?? []);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const takenCount = occurrences.filter((o) => o.status === "taken" || o.status === "skipped").length;
+  const takenCount = occurrences.filter(
+    (o) => o.status === "taken" || o.status === "skipped",
+  ).length;
   const total = occurrences.length;
   const upcoming = occurrences.filter((o) => o.status === "upcoming");
   const next = upcoming[0];
@@ -55,7 +57,10 @@ export default function TodayScreen() {
     }
   }
 
-  function handleAction(occurrence: ReturnType<typeof mapTodayOccurrences>[number], action: "taken" | "snooze" | "skip") {
+  function handleAction(
+    occurrence: ReturnType<typeof mapTodayOccurrences>[number],
+    action: "taken" | "snooze" | "skip",
+  ) {
     // "Taken" ahead of the scheduled time is allowed — someone may
     // genuinely take a dose early — but confirmed explicitly rather than
     // silently accepted, since a stray tap on the wrong card would
@@ -67,7 +72,7 @@ export default function TodayScreen() {
         [
           { text: "Cancel", style: "cancel" },
           { text: "Yes, taken", onPress: () => runAction(occurrence.id, action) },
-        ]
+        ],
       );
       return;
     }
@@ -88,7 +93,12 @@ export default function TodayScreen() {
             <Link href="/add-medication" asChild>
               <Pressable style={styles.addButton} accessibilityLabel="Add medicine">
                 <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                  <Path d="M12 5 V19 M5 12 H19" stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round" />
+                  <Path
+                    d="M12 5 V19 M5 12 H19"
+                    stroke="#FFFFFF"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                  />
                 </Svg>
               </Pressable>
             </Link>
@@ -235,7 +245,13 @@ function NextDoseCard({
             contentFit="cover"
           />
         ) : (
-          <View style={[styles.heroPhoto, styles.heroIconTile, { backgroundColor: occurrence.colorTag }]}>
+          <View
+            style={[
+              styles.heroPhoto,
+              styles.heroIconTile,
+              { backgroundColor: occurrence.colorTag },
+            ]}
+          >
             <FormIcon form={form} size={36} color={brand.woad} />
           </View>
         )}
@@ -255,11 +271,7 @@ function NextDoseCard({
       </View>
 
       <View style={styles.heroActions}>
-        <Pressable
-          style={styles.takenButton}
-          onPress={() => onAction("taken")}
-          disabled={busy}
-        >
+        <Pressable style={styles.takenButton} onPress={() => onAction("taken")} disabled={busy}>
           <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
             <Path
               d="M5 12.5 l4.5 4.5 L19 7.5"
@@ -273,7 +285,11 @@ function NextDoseCard({
             Taken
           </Text>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => onAction("snooze")} disabled={busy}>
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={() => onAction("snooze")}
+          disabled={busy}
+        >
           <Text allowFontScaling style={styles.secondaryButtonText}>
             Snooze
           </Text>
