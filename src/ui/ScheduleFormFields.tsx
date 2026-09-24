@@ -3,7 +3,8 @@
 // date. Extracted so both screens change together. See CLAUDE.md §6 for
 // the three V1 rule types this supports.
 
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import type { LocalTime, RuleConfig, Weekday } from "@/domain/regimen";
 import { TimeStepper } from "@/ui/TimeStepper";

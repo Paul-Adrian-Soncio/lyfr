@@ -2,9 +2,10 @@ import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { Text, View } from "react-native";
+import { AppState, Text, View } from "react-native";
 import { db } from "@/db/client";
 import migrations from "@/db/migrations/migrations";
+import { AndroidScheduler } from "@/scheduling/AndroidScheduler";
 import { registerBackgroundHeartbeat } from "@/scheduling/backgroundHeartbeat";
 import { reconcile } from "@/scheduling/heartbeat";
 import { registerForegroundEventHandler } from "@/scheduling/notificationEvents";
@@ -15,16 +16,28 @@ export default function RootLayout() {
   const { success, error } = useMigrations(db, migrations);
   const setSuspectedMissCount = useReliabilityStore((s) => s.setSuspectedMissCount);
 
-  // Reconciliation happens on launch, not at fire time — see CLAUDE.md §3
-  // and src/scheduling/heartbeat.ts. Runs once migrations have applied.
+  // On launch and every return to foreground: top reminders back up, then
+  // reconcile expected against observed fires. CLAUDE.md §3 — refill on
+  // every foreground and background wake, reconcile on launch rather than
+  // at fire time. Runs once migrations have applied.
   useEffect(() => {
     if (!success) return;
-    reconcile().then((result) => {
-      setSuspectedMissCount(result.suspectedMisses.length);
-    });
+
+    function checkIn() {
+      AndroidScheduler.refillWindow().catch((e) => console.warn("refillWindow failed", e));
+      reconcile().then((result) => setSuspectedMissCount(result.suspectedMisses.length));
+    }
+
+    checkIn();
     registerBackgroundHeartbeat();
-    const unsubscribe = registerForegroundEventHandler();
-    return unsubscribe;
+    const unsubscribeEvents = registerForegroundEventHandler();
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active") checkIn();
+    });
+    return () => {
+      unsubscribeEvents();
+      appState.remove();
+    };
   }, [success, setSuspectedMissCount]);
 
   if (error) {

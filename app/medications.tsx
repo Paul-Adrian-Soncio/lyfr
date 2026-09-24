@@ -10,7 +10,8 @@ import { desc, isNull } from "drizzle-orm";
 import { useLiveQuery } from "drizzle-orm/expo-sqlite";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import { db } from "@/db/client";
 import { medications } from "@/db/schema";
 import { formMeta, type MedicationForm } from "@/domain/medication";
@@ -31,10 +32,12 @@ export default function MedicationsScreen() {
         <Text allowFontScaling style={styles.title}>
           Medicines
         </Text>
-        <Link href="/add-medication" style={styles.addButton}>
-          <Text allowFontScaling style={styles.addButtonText}>
-            + Add
-          </Text>
+        <Link href="/add-medication" asChild>
+          <Pressable style={styles.addButton}>
+            <Text allowFontScaling style={styles.addButtonText}>
+              + Add
+            </Text>
+          </Pressable>
         </Link>
       </View>
 

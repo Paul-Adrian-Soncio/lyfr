@@ -3,7 +3,8 @@
 // with a button back into the battery settings walkthrough."
 
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { doseStatus, typography } from "@/theme/tokens";
 import { useReliabilityStore } from "./reliabilityStore";

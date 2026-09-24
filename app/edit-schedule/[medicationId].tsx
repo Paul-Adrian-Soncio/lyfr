@@ -14,7 +14,8 @@
 import { and, eq } from "drizzle-orm";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { db } from "@/db/client";
 import { medications, regimens } from "@/db/schema";

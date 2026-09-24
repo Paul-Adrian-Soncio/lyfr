@@ -4,7 +4,8 @@
 // those differ.
 
 import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { formMeta, type MedicationForm } from "@/domain/medication";
 import { captureMedicationPhoto, resolveMedicationPhotoUri } from "@/domain/medicationPhoto";

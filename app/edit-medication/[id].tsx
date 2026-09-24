@@ -5,14 +5,16 @@
 // Confirmation on archive is resistant to accidental taps (§6, "Elderly UX
 // baseline") via a native two-step Alert rather than a single tap.
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Link, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { db } from "@/db/client";
-import { medications } from "@/db/schema";
+import { medications, regimens } from "@/db/schema";
 import { formMeta, type MedicationForm } from "@/domain/medication";
+import { AndroidScheduler } from "@/scheduling/AndroidScheduler";
 import { MedicationFormFields, type MedicationFormState } from "@/ui/MedicationFormFields";
 import { brand, light, radii, typography } from "@/theme/tokens";
 
@@ -75,7 +77,17 @@ export default function EditMedicationScreen() {
     );
   }
 
+  // Archiving stops the reminders too — before this it only hid the
+  // medicine from the list while its alarms kept firing. Past doses stay
+  // untouched so History keeps them (cancelRegimen is future-only).
   async function handleArchiveConfirmed() {
+    const active = await db.query.regimens.findMany({
+      where: and(eq(regimens.medicationId, id), eq(regimens.active, true)),
+    });
+    for (const regimen of active) {
+      await AndroidScheduler.cancelRegimen(regimen.id);
+      await db.update(regimens).set({ active: false, updatedAt: Date.now() }).where(eq(regimens.id, regimen.id));
+    }
     await db.update(medications).set({ archivedAt: Date.now() }).where(eq(medications.id, id));
     router.back();
   }

@@ -10,7 +10,8 @@ import { useLiveQuery } from "drizzle-orm/expo-sqlite";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import { formMeta, type MedicationForm } from "@/domain/medication";
 import { resolveMedicationPhotoUri } from "@/domain/medicationPhoto";
@@ -84,10 +85,12 @@ export default function TodayScreen() {
                 lyfr
               </Text>
             </View>
-            <Link href="/add-medication" style={styles.addButton}>
-              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                <Path d="M12 5 V19 M5 12 H19" stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round" />
-              </Svg>
+            <Link href="/add-medication" asChild>
+              <Pressable style={styles.addButton} accessibilityLabel="Add medicine">
+                <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                  <Path d="M12 5 V19 M5 12 H19" stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round" />
+                </Svg>
+              </Pressable>
             </Link>
           </View>
 

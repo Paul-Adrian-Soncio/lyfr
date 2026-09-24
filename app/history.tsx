@@ -10,8 +10,10 @@
 import { useLiveQuery } from "drizzle-orm/expo-sqlite";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
+import { type DoseActivity, doseActivity } from "@/domain/doseActivity";
 import { correctionOptions, type EffectiveStatus, effectiveStatus, summarizeDay } from "@/domain/doseStatus";
 import type { MedicationForm } from "@/domain/medication";
 import { correctDose } from "@/scheduling/doseActions";
@@ -36,6 +38,30 @@ const CORRECTION_LABELS: Record<EffectiveStatus, string> = {
 
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+// Adds the weekday when the event fell on a different day from the dose,
+// so a 10pm dose taken at 1am doesn't read as taken before it was due.
+function formatEventTime(at: number, scheduledAt: number): string {
+  const time = formatTime(at);
+  if (new Date(at).toDateString() === new Date(scheduledAt).toDateString()) return time;
+  return `${new Date(at).toLocaleDateString(undefined, { weekday: "short" })} ${time}`;
+}
+
+function describeActivity(activity: DoseActivity, scheduledAt: number): string {
+  const at = formatEventTime(activity.at, scheduledAt);
+  switch (activity.kind) {
+    case "snoozed":
+      return activity.count === 1
+        ? `Snoozed at ${at}`
+        : `Snoozed ${activity.count} times, last at ${at}`;
+    case "taken":
+      return `Taken at ${at}`;
+    case "skipped":
+      return `Skipped at ${at}`;
+    case "changed":
+      return `Changed from ${activity.from} to ${activity.to} at ${at}`;
+  }
 }
 
 function formatRange(days: Date[]): string {
@@ -219,6 +245,11 @@ function DoseRow({
         </View>
         <StatusPill status={status} />
       </View>
+      {doseActivity(row).map((activity) => (
+        <Text key={activity.kind} allowFontScaling style={styles.activityText}>
+          {describeActivity(activity, row.scheduledAt)}
+        </Text>
+      ))}
       {canCorrect && (
         <Pressable onPress={onCorrect} style={styles.correctButton}>
           <Text allowFontScaling style={styles.correctText}>
@@ -395,6 +426,12 @@ const styles = StyleSheet.create({
     fontSize: typography.absoluteMinSp,
     color: light.textMuted,
     fontVariant: ["tabular-nums"],
+  },
+  activityText: {
+    fontSize: typography.absoluteMinSp,
+    color: light.textMuted,
+    fontVariant: ["tabular-nums"],
+    marginTop: -4,
   },
   correctButton: {
     height: 48,

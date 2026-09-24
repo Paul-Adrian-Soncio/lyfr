@@ -12,7 +12,8 @@
 // primary buttons, Fjord-outline secondary buttons.
 
 import { useCallback, useEffect, useState } from "react";
-import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import {
   checkDeviceSupport,

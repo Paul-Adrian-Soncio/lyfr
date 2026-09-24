@@ -38,7 +38,12 @@ export function weekOccurrencesQuery(lastDay: Date) {
       ne(doseOccurrences.status, "cancelled")
     ),
     orderBy: asc(doseOccurrences.scheduledAt),
-    with: { regimen: { with: { medication: true } } },
+    with: {
+      regimen: { with: { medication: true } },
+      // Newest first — the latest correction is what explains the
+      // current status.
+      edits: { orderBy: (edit, { desc }) => desc(edit.editedAt) },
+    },
   });
 }
 

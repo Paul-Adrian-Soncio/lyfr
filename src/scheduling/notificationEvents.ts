@@ -9,6 +9,8 @@
 
 import notifee, { EventType } from "@notifee/react-native";
 import type { Event } from "@notifee/react-native";
+import { NOTIFICATION_ACTION } from "./AndroidScheduler";
+import { markSkipped, markTaken, snooze } from "./doseActions";
 import { logObservedFire } from "./heartbeat";
 
 export async function handleEvent({ type, detail }: Event): Promise<void> {
@@ -17,6 +19,23 @@ export async function handleEvent({ type, detail }: Event): Promise<void> {
 
   if (type === EventType.DELIVERED) {
     await logObservedFire(occurrenceId);
+    return;
+  }
+
+  // The notification's own buttons. Same functions the Today screen calls,
+  // so the two paths can't drift. Each one also clears the notification.
+  if (type === EventType.ACTION_PRESS) {
+    switch (detail.pressAction?.id) {
+      case NOTIFICATION_ACTION.taken:
+        await markTaken(occurrenceId);
+        break;
+      case NOTIFICATION_ACTION.skip:
+        await markSkipped(occurrenceId);
+        break;
+      case NOTIFICATION_ACTION.snooze:
+        await snooze(occurrenceId);
+        break;
+    }
   }
 }
 

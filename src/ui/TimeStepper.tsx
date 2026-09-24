@@ -11,7 +11,8 @@
 // shift width as they change. Revisit the native picker if any of this
 // turns out not to hold up in practice — see STATE.md.
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { Pressable } from "@/ui/Pressable";
 import Svg, { Path } from "react-native-svg";
 import type { LocalTime } from "@/domain/regimen";
 import { brand, light, radii } from "@/theme/tokens";

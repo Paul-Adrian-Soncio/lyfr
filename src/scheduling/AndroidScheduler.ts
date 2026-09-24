@@ -51,6 +51,14 @@ async function ensurePermission(): Promise<void> {
   }
 }
 
+// Checks without prompting — for refills, which run on launch and in the
+// background heartbeat task, where a permission dialog would be at best
+// unexpected and at worst impossible to show.
+async function hasPermission(): Promise<boolean> {
+  const settings = await notifee.getNotificationSettings();
+  return settings.authorizationStatus !== AuthorizationStatus.DENIED;
+}
+
 async function ensureChannel(): Promise<void> {
   await notifee.createChannel({
     id: REMINDER_CHANNEL_ID,
@@ -87,6 +95,15 @@ function toDomainRegimen(row: typeof regimens.$inferSelect): Regimen {
   };
 }
 
+// Action ids, matched in notificationEvents.ts. CLAUDE.md §6: Taken, Snooze
+// and Skip work from the notification without opening the app — actions
+// with no launchActivity run in the background event handler instead.
+export const NOTIFICATION_ACTION = {
+  taken: "taken",
+  snooze: "snooze",
+  skip: "skip",
+} as const;
+
 // Exported for reuse by doseActions.ts's snooze — rescheduling a single
 // occurrence outside a full syncRegimen pass needs the same notification
 // shape, and duplicating it risks the two drifting apart.
@@ -103,7 +120,14 @@ export async function scheduleOccurrenceNotification(
       android: {
         channelId: REMINDER_CHANNEL_ID,
         category: AndroidCategory.ALARM,
-        pressAction: { id: "default" },
+        // Tapping the body opens the app. Without launchActivity, Notifee
+        // treats the press as background-only and nothing visible happens.
+        pressAction: { id: "default", launchActivity: "default" },
+        actions: [
+          { title: "Taken", pressAction: { id: NOTIFICATION_ACTION.taken } },
+          { title: "Snooze", pressAction: { id: NOTIFICATION_ACTION.snooze } },
+          { title: "Skip", pressAction: { id: NOTIFICATION_ACTION.skip } },
+        ],
       },
     },
     {
@@ -113,6 +137,57 @@ export async function scheduleOccurrenceNotification(
     }
   );
 }
+
+// Materialises and schedules the regimen's occurrences for the current
+// window. Callers are responsible for permission and channel setup.
+async function syncOccurrences(regimen: Regimen, medicationName: string): Promise<void> {
+  const { windowStart, windowEnd } = currentWindow();
+  const generated = generateOccurrences(regimen, windowStart, windowEnd);
+  const now = Date.now();
+
+  const existing = await db.query.doseOccurrences.findMany({
+    where: eq(doseOccurrences.regimenId, regimen.id),
+  });
+  // Any live row at a time means that slot is handled — upcoming, taken,
+  // skipped or missed alike. Only "cancelled" rows (left by an edit, see
+  // cancelRegimen) are ignored, so an edited rule landing on the same clock
+  // time as the old one still gets a fresh row. An earlier version counted
+  // only "upcoming" rows, which re-booked any dose already taken today on
+  // every refill. Both found 2026-09-24/25 — see STATE.md.
+  const handledTimes = new Set(
+    existing.filter((row) => row.status !== "cancelled").map((row) => row.scheduledAt)
+  );
+
+  for (const occurrence of generated) {
+    // The window starts at midnight today, so it includes times already
+    // gone. Never book those: a schedule saved at noon shouldn't invent a
+    // missed 8am dose, and the OS can't fire a reminder in the past.
+    if (occurrence.scheduledAt <= now || handledTimes.has(occurrence.scheduledAt)) {
+      continue;
+    }
+
+    const [inserted] = await db
+      .insert(doseOccurrences)
+      .values({
+        id: Crypto.randomUUID(),
+        regimenId: regimen.id,
+        scheduledAt: occurrence.scheduledAt,
+        status: "upcoming",
+      })
+      .returning();
+
+    await scheduleOccurrenceNotification(inserted.id, medicationName, inserted.scheduledAt);
+
+    await db
+      .update(doseOccurrences)
+      .set({ actualNotificationId: inserted.id })
+      .where(eq(doseOccurrences.id, inserted.id));
+
+    await logExpectedFire(inserted.id, inserted.scheduledAt, REMINDER_CHANNEL_ID);
+  }
+}
+
+let refillInFlight: Promise<void> | null = null;
 
 export const AndroidScheduler: Scheduler = {
   async syncRegimen(regimen: Regimen): Promise<void> {
@@ -131,60 +206,19 @@ export const AndroidScheduler: Scheduler = {
       return;
     }
 
-    const { windowStart, windowEnd } = currentWindow();
-    const generated = generateOccurrences(regimen, windowStart, windowEnd);
-
-    const existing = await db.query.doseOccurrences.findMany({
-      where: eq(doseOccurrences.regimenId, regimen.id),
-    });
-    // Only rows still "upcoming" count as already handled. A "cancelled"
-    // row at the same scheduledAt (left behind by a prior edit — see
-    // cancelRegimen) must NOT block a fresh row from being inserted here,
-    // or an edited regimen whose new rule happens to land on the same
-    // clock time as the old one silently generates nothing at all. Found
-    // 2026-09-24 while testing schedule editing — see STATE.md.
-    const existingByTime = new Map(
-      existing.filter((row) => row.status === "upcoming").map((row) => [row.scheduledAt, row])
-    );
-
-    for (const occurrence of generated) {
-      const existingRow = existingByTime.get(occurrence.scheduledAt);
-      if (existingRow) {
-        // Already materialised (and, if still pending, already scheduled
-        // with the OS under this row's id) — idempotent no-op.
-        continue;
-      }
-
-      const [inserted] = await db
-        .insert(doseOccurrences)
-        .values({
-          id: Crypto.randomUUID(),
-          regimenId: regimen.id,
-          scheduledAt: occurrence.scheduledAt,
-          status: "upcoming",
-        })
-        .returning();
-
-      await scheduleOccurrenceNotification(
-        inserted.id,
-        medication.name,
-        inserted.scheduledAt
-      );
-
-      await db
-        .update(doseOccurrences)
-        .set({ actualNotificationId: inserted.id })
-        .where(eq(doseOccurrences.id, inserted.id));
-
-      await logExpectedFire(inserted.id, inserted.scheduledAt, REMINDER_CHANNEL_ID);
-    }
+    await syncOccurrences(regimen, medication.name);
   },
 
   async cancelRegimen(regimenId: string): Promise<void> {
     const rows = await db.query.doseOccurrences.findMany({
       where: eq(doseOccurrences.regimenId, regimenId),
     });
-    const upcoming = rows.filter((row) => row.status === "upcoming");
+    // Future doses only. A dose already past its time is part of the
+    // record — untouched, it reads as missed in History — and cancelling
+    // it here would erase that miss whenever the schedule was edited or
+    // the medicine archived. Found 2026-09-25 while wiring refills.
+    const now = Date.now();
+    const upcoming = rows.filter((row) => row.status === "upcoming" && row.scheduledAt > now);
     const idsToCancel = upcoming
       .filter((row) => row.actualNotificationId)
       .map((row) => row.actualNotificationId as string);
@@ -206,13 +240,29 @@ export const AndroidScheduler: Scheduler = {
     }
   },
 
+  // Tops the rolling window back up to WINDOW_DAYS ahead. Without this,
+  // each regimen only ever has the week that existed when it was saved,
+  // and reminders silently stop a week later. Runs on launch, on return to
+  // foreground, and from the background heartbeat task (CLAUDE.md §3).
   async refillWindow(): Promise<void> {
-    const activeRegimens = await db.query.regimens.findMany({
-      where: eq(regimens.active, true),
+    // Launch and foreground can fire close together. Two overlapping runs
+    // would both see a slot as empty and book it twice.
+    if (refillInFlight) return refillInFlight;
+    refillInFlight = (async () => {
+      if (!(await hasPermission())) return;
+      await ensureChannel();
+      const activeRegimens = await db.query.regimens.findMany({
+        where: eq(regimens.active, true),
+        with: { medication: true },
+      });
+      for (const row of activeRegimens) {
+        if (row.medication.archivedAt != null) continue;
+        await syncOccurrences(toDomainRegimen(row), row.medication.name);
+      }
+    })().finally(() => {
+      refillInFlight = null;
     });
-    for (const row of activeRegimens) {
-      await this.syncRegimen(toDomainRegimen(row));
-    }
+    return refillInFlight;
   },
 
   async pendingCount(): Promise<number> {

@@ -13,12 +13,17 @@
 
 import * as BackgroundTask from "expo-background-task";
 import * as TaskManager from "expo-task-manager";
+import { AndroidScheduler } from "./AndroidScheduler";
 import { reconcile } from "./heartbeat";
 
 export const HEARTBEAT_TASK_NAME = "lyfr-heartbeat-check";
 
+// Also refills the reminder window: for someone who rarely opens the app,
+// this task is the only thing topping reminders up (CLAUDE.md §3, "top up
+// on every app foreground and every background wake").
 TaskManager.defineTask(HEARTBEAT_TASK_NAME, async () => {
   try {
+    await AndroidScheduler.refillWindow();
     await reconcile();
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch {

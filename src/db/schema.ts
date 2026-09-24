@@ -51,6 +51,10 @@ export const doseOccurrences = sqliteTable("dose_occurrences", {
   scheduledAt: integer("scheduled_at").notNull(),
   status: text("status").notNull(),
   acknowledgedAt: integer("acknowledged_at"),
+  // Snoozes don't change status, so they'd otherwise leave no trace.
+  // Shown in History alongside when the dose was taken.
+  snoozeCount: integer("snooze_count").notNull().default(0),
+  lastSnoozedAt: integer("last_snoozed_at"),
   actualNotificationId: text("actual_notification_id"),
   createdAt: integer("created_at")
     .notNull()
